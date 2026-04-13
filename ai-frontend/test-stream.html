@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stream 调试页</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
+    .row { display: flex; gap: 8px; margin-bottom: 10px; }
+    input { flex: 1; padding: 8px; }
+    button { padding: 8px 12px; }
+    pre { border: 1px solid #ddd; background: #f7f7f7; padding: 10px; min-height: 260px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>流式接口调试（Authorization 头）</h1>
+
+  <div class="row">
+    <input id="token" placeholder="粘贴 JWT Token" />
+  </div>
+  <div class="row">
+    <input id="query" placeholder="输入问题" value="你好" />
+    <button id="send">发送</button>
+  </div>
+
+  <pre id="out"></pre>
+
+  <script>
+    const tokenEl = document.getElementById('token')
+    const queryEl = document.getElementById('query')
+    const outEl = document.getElementById('out')
+    const sendBtn = document.getElementById('send')
+
+    function append(line) {
+      outEl.textContent += line + '\n'
+      outEl.scrollTop = outEl.scrollHeight
+    }
+
+    function parseSseBlock(block) {
+      const lines = block.split(/\r?\n/)
+      const data = []
+      for (const line of lines) {
+        if (line.startsWith('data:')) data.push(line.slice(5).trimStart())
+      }
+      return data.join('\n')
+    }
+
+    async function run() {
+      const token = tokenEl.value.trim()
+      const query = queryEl.value.trim()
+      if (!token || !query) return
+
+      outEl.textContent = ''
+      append('requesting...')
+
+      const res = await fetch(`http://localhost:8081/api/ai/chat/stream?query=${encodeURIComponent(query)}`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' }
+      })
+
+      append('status: ' + res.status)
+      if (!res.ok || !res.body) {
+        append(await res.text())
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const chunks = buffer.split(/\r?\n\r?\n/)
+        buffer = chunks.pop() || ''
+        for (const chunk of chunks) {
+          const payload = parseSseBlock(chunk)
+          if (payload) append(payload)
+        }
+      }
+    }
+
+    sendBtn.addEventListener('click', run)
+  </script>
+</body>
+</html>

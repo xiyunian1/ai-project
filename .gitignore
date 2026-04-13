@@ -1,0 +1,6 @@
+.idea/
+.vscode/
+*.log
+tmp-*
+ai-frontend/dist-app/
+ai-frontend/dist-electron/

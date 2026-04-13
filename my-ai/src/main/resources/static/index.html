@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI聊天 - 流式演示</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .mode-selector label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .response-container {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AI聊天 - 流式演示</h1>
+        
+        <div class="mode-selector">
+            <label>
+                <input type="radio" name="mode" value="stream" checked>
+                流式模式
+            </label>
+            <label>
+                <input type="radio" name="mode" value="blocking">
+                阻塞模式
+            </label>
+        </div>
+        
+        <div class="input-group">
+            <input type="text" id="queryInput" placeholder="请输入您的问题..." value="介绍一下Spring Boot">
+            <button id="sendBtn">发送</button>
+        </div>
+        
+        <div class="response-container" id="responseArea">
+            等待输入...
+        </div>
+        
+        <div class="status info" id="statusArea">
+            准备就绪
+        </div>
+    </div>
+
+    <script>
+        const queryInput = document.getElementById('queryInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const responseArea = document.getElementById('responseArea');
+        const statusArea = document.getElementById('statusArea');
+        let eventSource = null;
+
+        function updateStatus(message, type = 'info') {
+            statusArea.textContent = message;
+            statusArea.className = `status ${type}`;
+        }
+
+        function clearResponse() {
+            responseArea.textContent = '';
+        }
+
+        function appendResponse(text) {
+            responseArea.textContent += text;
+            responseArea.scrollTop = responseArea.scrollHeight;
+        }
+
+        async function sendBlockingRequest() {
+            const query = queryInput.value.trim();
+            if (!query) {
+                updateStatus('请输入问题', 'error');
+                return;
+            }
+
+            sendBtn.disabled = true;
+            clearResponse();
+            updateStatus('正在发送请求...', 'info');
+
+            try {
+                const response = await fetch(`http://localhost:8081/api/ai/chat?query=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP错误: ${response.status}`);
+                }
+                const data = await response.text();
+                appendResponse(data);
+                updateStatus('请求完成', 'success');
+            } catch (error) {
+                updateStatus(`错误: ${error.message}`, 'error');
+            } finally {
+                sendBtn.disabled = false;
+            }
+        }
+
+        function sendStreamingRequest() {
+            const query = queryInput.value.trim();
+            if (!query) {
+                updateStatus('请输入问题', 'error');
+                return;
+            }
+
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            sendBtn.disabled = true;
+            clearResponse();
+            updateStatus('正在建立流式连接...', 'info');
+
+            const url = `http://localhost:8081/api/ai/chat/stream?query=${encodeURIComponent(query)}`;
+            eventSource = new EventSource(url);
+
+            eventSource.onopen = () => {
+                updateStatus('流式连接已建立，等待响应...', 'info');
+            };
+
+            eventSource.onmessage = (event) => {
+                const data = event.data;
+                if (data === '[DONE]') {
+                    eventSource.close();
+                    updateStatus('流式响应完成', 'success');
+                    sendBtn.disabled = false;
+                    eventSource = null;
+                } else {
+                    appendResponse(data);
+                }
+            };
+
+            eventSource.onerror = (error) => {
+                updateStatus(`流式连接错误: ${error.message || '未知错误'}`, 'error');
+                eventSource.close();
+                sendBtn.disabled = false;
+                eventSource = null;
+            };
+        }
+
+        sendBtn.addEventListener('click', () => {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            if (mode === 'stream') {
+                sendStreamingRequest();
+            } else {
+                sendBlockingRequest();
+            }
+        });
+
+        queryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click();
+            }
+        });
+
+        // 页面卸载时关闭EventSource
+        window.addEventListener('beforeunload', () => {
+            if (eventSource) {
+                eventSource.close();
+            }
+        });
+    </script>
+</body>
+</html>
