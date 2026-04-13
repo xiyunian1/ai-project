@@ -4,3 +4,4 @@
 tmp-*
 ai-frontend/dist-app/
 ai-frontend/dist-electron/
+my-ai/node_modules/
