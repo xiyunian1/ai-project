@@ -1,9 +1,9 @@
 <template>
   <div class="workspace-shell analysis-layout">
-    <WorkspaceSidebar
-      eyebrow="Analysis Workspace"
-      title="分析助手"
-      description="保留上下文和数据库配置的分析工作区。"
+      <WorkspaceSidebar
+        eyebrow="分析助手"
+        title="分析助手"
+        description="自然语言提问、SQL 查询和业务结论生成。"
       mark="BI"
       :show-create="true"
       create-label="新建分析"
@@ -69,7 +69,7 @@
       <header class="analysis-header">
         <div class="title-wrap">
           <div class="title-copy">
-            <p class="brand-eyebrow">Data Analysis</p>
+            <p class="brand-eyebrow">数据分析</p>
             <div class="title-mainline">
               <h1 v-if="!editingTitle">{{ allSessions[currentSessionId]?.name || '分析助手' }}</h1>
               <input
@@ -84,13 +84,13 @@
                 {{ editingTitle ? '完成编辑' : '重命名' }}
               </button>
             </div>
-            <p class="title-subline">支持连续追问、SQL 明细和自定义 SQL Server 连接。</p>
+            <p class="title-subline">将自然语言问题转为 SQL 查询，并展示可追溯的分析结论。</p>
             <div class="header-inline-meta">
               <span class="header-annotation">连续追问</span>
               <span class="header-dot"></span>
-              <span class="header-annotation">SQL 明细可回看</span>
+              <span class="header-annotation">SQL 过程可回看</span>
               <span class="header-dot"></span>
-              <span class="header-annotation">{{ dbConfig.enabled ? '自定义连接已启用' : '默认连接可直接使用' }}</span>
+              <span class="header-annotation">真实数据库连接</span>
             </div>
           </div>
         </div>
@@ -98,9 +98,7 @@
         <div class="header-actions">
           <div class="header-badges">
             <span class="header-pill active">分析工作区</span>
-            <span :class="['header-pill', dbConfig.enabled ? 'accent' : '']">
-              {{ dbConfig.enabled ? '自定义连接' : '默认连接' }}
-            </span>
+            <span class="header-pill accent">真实数据库</span>
           </div>
           <div class="header-tools">
             <button
@@ -115,27 +113,46 @@
         </div>
       </header>
 
-      <section class="connection-strip" @click="openDbConfig">
+      <section class="connection-strip" @click="goSettings">
         <div class="connection-strip-copy">
-          <span :class="['connection-mode', dbConfig.enabled ? 'accent' : '']">
-            {{ dbConfig.enabled ? '已启用自定义连接' : '当前使用默认连接' }}
-          </span>
+          <span class="connection-mode accent">当前使用真实数据库连接</span>
           <div class="connection-copy-block">
             <strong>数据库连接</strong>
             <span class="connection-summary">{{ dbConfigSummary }}</span>
           </div>
         </div>
-        <button class="connection-action" type="button" @click.stop="openDbConfig">修改连接配置</button>
+        <button class="connection-action" type="button" @click.stop="goSettings">前往系统配置</button>
+      </section>
+
+      <section class="analysis-step-panel surface-panel" aria-label="AI 分析步骤">
+        <div class="panel-head">
+          <div>
+            <p class="brand-eyebrow">分析时间线</p>
+            <h2>分析过程</h2>
+            <p class="panel-note">从问题理解到 SQL 查询，再到结论生成，展示毕业设计中的 AI 辅助决策链路。</p>
+          </div>
+          <span :class="['status-pill', loading ? 'is-brand' : '']">{{ loading ? '运行中' : '就绪' }}</span>
+        </div>
+
+        <div class="analysis-step-list">
+          <article v-for="(step, index) in analysisSteps" :key="step.key" :class="['analysis-step', step.status]">
+            <span class="analysis-step-index">{{ index + 1 }}</span>
+            <div>
+              <strong>{{ step.label }}</strong>
+              <p>{{ step.detail || step.desc }}</p>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section ref="scrollRef" class="analysis-window">
         <div v-if="chatList.length === 0" class="welcome-box">
           <div class="welcome-logo">BI</div>
-          <p class="brand-eyebrow">Analysis Deck</p>
-          <h2>先配置连接，再开始提问。</h2>
-          <p>分析页适合做连续追问、SQL 可视回看和面向管理层的结果归纳。</p>
+          <p class="brand-eyebrow">分析面板</p>
+          <h2>输入库存或商品问题，查看 AI 分析过程。</h2>
+          <p>系统会展示问题理解、SQL 查询和结论生成过程，适合毕业设计演示自然语言数据分析能力。</p>
           <div class="welcome-ledger">
-            <span class="ledger-chip">连接可切换</span>
+            <span class="ledger-chip">真实数据库分析</span>
             <span class="ledger-chip">结果可追问</span>
             <span class="ledger-chip">SQL 明细保留</span>
           </div>
@@ -185,8 +202,8 @@
 
       <footer class="input-panel">
         <div class="composer-meta">
-          <span class="composer-state">{{ dbConfig.enabled ? '自定义连接' : '默认连接' }}</span>
-          <p class="composer-hint">{{ dbConfig.enabled ? dbConfigSummary : '可直接开始分析，也可以先切换到自定义 SQL Server 连接。' }}</p>
+          <span class="composer-state">真实数据库</span>
+          <p class="composer-hint">{{ dbConfigSummary }}</p>
         </div>
         <div v-if="statusText" class="info-banner">{{ statusText }}</div>
 
@@ -208,74 +225,6 @@
       </footer>
     </main>
 
-    <div v-if="dbConfigDialogVisible" class="db-dialog-mask" @click.self="closeDbConfig">
-      <section class="db-dialog">
-        <header class="db-dialog-header">
-          <div>
-            <p class="brand-eyebrow">Database Config</p>
-            <h3>SQL Server 连接配置</h3>
-            <p>支持默认连接和自定义连接两种模式。</p>
-          </div>
-          <button type="button" class="db-dialog-close" @click="closeDbConfig">×</button>
-        </header>
-
-        <label class="db-checkbox-line">
-          <input v-model="dbConfigDraft.enabled" type="checkbox" />
-          <span>启用自定义数据库连接</span>
-        </label>
-
-        <div class="db-form-grid">
-          <label>
-            <span>服务器</span>
-            <input v-model.trim="dbConfigDraft.server" type="text" placeholder="localhost" />
-          </label>
-          <label>
-            <span>端口</span>
-            <input v-model.number="dbConfigDraft.port" type="number" min="1" max="65535" placeholder="1433" />
-          </label>
-          <label>
-            <span>数据库名</span>
-            <input v-model.trim="dbConfigDraft.database" type="text" placeholder="myai" />
-          </label>
-          <label>
-            <span>用户名</span>
-            <input v-model.trim="dbConfigDraft.username" type="text" placeholder="sa" />
-          </label>
-          <label>
-            <span>密码</span>
-            <input v-model="dbConfigDraft.password" type="password" placeholder="password" />
-          </label>
-          <label>
-            <span>JDBC URL（可选）</span>
-            <input
-              v-model.trim="dbConfigDraft.jdbcUrl"
-              type="text"
-              placeholder="jdbc:jtds:sqlserver://localhost:1433/myai"
-            />
-          </label>
-          <label class="db-full-row">
-            <span>允许的表（可选，逗号分隔）</span>
-            <input
-              v-model.trim="dbConfigDraft.allowedTables"
-              type="text"
-              placeholder="dbo.inout,dbo.sales"
-            />
-          </label>
-        </div>
-
-        <label class="db-checkbox-line">
-          <input v-model="dbConfigDraft.discoverTables" type="checkbox" />
-          <span>当允许表为空时自动发现数据库中的表</span>
-        </label>
-
-        <p v-if="dbConfigError" class="error-banner">{{ dbConfigError }}</p>
-
-        <footer class="db-dialog-footer">
-          <button type="button" class="secondary-btn" @click="closeDbConfig">取消</button>
-          <button type="button" class="send-btn" @click="saveDbConfig">保存配置</button>
-        </footer>
-      </section>
-    </div>
   </div>
 </template>
 
@@ -289,9 +238,23 @@ import {
   ACCOUNT_KEY,
   NAME_KEY,
   clearAuthSession,
+  getToken,
   isTokenValid,
+  resolveAccountKey,
   withAuthHeaders
 } from '../utils/auth'
+import { buildApiUrl } from '../utils/api'
+import {
+  buildDbConfigPayload,
+  createDefaultDbConfig,
+  loadDbConfigFromStorage
+} from '../utils/analysisDbConfig'
+import { buildModelConfigPayload, loadModelConfigFromLocal } from '../utils/modelConfig'
+import {
+  completeAnalysisSteps,
+  createInitialAnalysisSteps,
+  updateAnalysisSteps
+} from '../utils/analysisSteps'
 import WorkspaceSidebar from '../components/WorkspaceSidebar.vue'
 import { getCurrentTheme, toggleTheme } from '../utils/theme'
 import { getWorkspaceFeatureKeyByPath } from '../utils/workspace'
@@ -299,7 +262,6 @@ import { getWorkspaceFeatureKeyByPath } from '../utils/workspace'
 const router = useRouter()
 const route = useRoute()
 const md = new MarkdownIt({ breaks: true, html: false, linkify: true, typographer: true })
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
 const CHAT_STORAGE_PREFIX = 'WMS_ANALYSIS_CHATS'
 const DB_CONFIG_STORAGE_PREFIX = 'WMS_ANALYSIS_DB_CONFIG'
 const DEFAULT_SESSION_NAME = '新分析'
@@ -310,6 +272,7 @@ const SQL_TAIL_MARKER = '\n\n---\n'
 const inputVal = ref('')
 const loading = ref(false)
 const statusText = ref('')
+const analysisSteps = ref(createInitialAnalysisSteps())
 const scrollRef = ref(null)
 const themeMode = ref(getCurrentTheme())
 const editingTitle = ref(false)
@@ -317,9 +280,6 @@ const editTitleValue = ref('')
 const titleInput = ref(null)
 const streamAbortController = ref(null)
 const streamRequestSeq = ref(0)
-
-const dbConfigDialogVisible = ref(false)
-const dbConfigError = ref('')
 
 const quickPrompts = [
   {
@@ -336,43 +296,15 @@ const quickPrompts = [
   }
 ]
 
-const createDefaultDbConfig = () => ({
-  enabled: false,
-  server: 'localhost',
-  port: 1433,
-  database: '',
-  username: '',
-  password: '',
-  jdbcUrl: '',
-  allowedTables: '',
-  discoverTables: true
-})
-
 const dbConfig = ref(createDefaultDbConfig())
-const dbConfigDraft = ref(createDefaultDbConfig())
-
-const normalizeAccountKey = (value) => {
-  const key = (value || '').trim()
-  return key || 'guest'
-}
-
-const resolveAccountFromToken = () => {
-  try {
-    const token = localStorage.getItem('USER_TOKEN') || ''
-    if (!token) return ''
-    const parts = token.split('.')
-    if (parts.length < 2) return ''
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-    return payload?.sub || ''
-  } catch {
-    return ''
-  }
-}
+const modelConfig = ref(loadModelConfigFromLocal(localStorage))
 
 const currentAccount = ref(
-  normalizeAccountKey(
-    localStorage.getItem(ACCOUNT_KEY) || resolveAccountFromToken() || localStorage.getItem(NAME_KEY) || 'guest'
-  )
+  resolveAccountKey({
+    account: localStorage.getItem(ACCOUNT_KEY),
+    token: getToken(),
+    name: localStorage.getItem(NAME_KEY)
+  })
 )
 
 const getStorageKey = () => `${CHAT_STORAGE_PREFIX}_${currentAccount.value}`
@@ -395,7 +327,6 @@ const sortedSessions = computed(() => {
 
 const dbConfigSummary = computed(() => {
   const cfg = dbConfig.value
-  if (!cfg.enabled) return '当前：默认连接'
   if (cfg.jdbcUrl) return `当前：${cfg.jdbcUrl}`
   const server = cfg.server || 'localhost'
   const port = cfg.port || 1433
@@ -403,33 +334,8 @@ const dbConfigSummary = computed(() => {
   return `当前：${server}:${port}/${database}`
 })
 
-const cloneDbConfig = (source) => ({
-  enabled: Boolean(source?.enabled),
-  server: source?.server || 'localhost',
-  port: Number(source?.port) || 1433,
-  database: source?.database || '',
-  username: source?.username || '',
-  password: source?.password || '',
-  jdbcUrl: source?.jdbcUrl || '',
-  allowedTables: source?.allowedTables || '',
-  discoverTables: source?.discoverTables !== false
-})
-
 const loadDbConfigFromLocal = () => {
-  const raw = localStorage.getItem(getDbConfigStorageKey())
-  if (!raw) {
-    dbConfig.value = createDefaultDbConfig()
-    return
-  }
-  try {
-    dbConfig.value = cloneDbConfig(JSON.parse(raw))
-  } catch {
-    dbConfig.value = createDefaultDbConfig()
-  }
-}
-
-const saveDbConfigToLocal = () => {
-  localStorage.setItem(getDbConfigStorageKey(), JSON.stringify(dbConfig.value))
+  dbConfig.value = loadDbConfigFromStorage(localStorage, getDbConfigStorageKey())
 }
 
 const applyPrompt = (prompt) => {
@@ -438,54 +344,6 @@ const applyPrompt = (prompt) => {
 
 const handleThemeToggle = () => {
   themeMode.value = toggleTheme()
-}
-
-const openDbConfig = () => {
-  dbConfigError.value = ''
-  dbConfigDraft.value = cloneDbConfig(dbConfig.value)
-  dbConfigDialogVisible.value = true
-}
-
-const closeDbConfig = () => {
-  dbConfigDialogVisible.value = false
-  dbConfigError.value = ''
-}
-
-const saveDbConfig = () => {
-  const cfg = cloneDbConfig(dbConfigDraft.value)
-  if (cfg.enabled) {
-    const hasUrl = Boolean(cfg.jdbcUrl.trim())
-    if (!hasUrl) {
-      if (!cfg.server.trim()) {
-        dbConfigError.value = '服务器不能为空'
-        return
-      }
-      if (!cfg.database.trim()) {
-        dbConfigError.value = '数据库名不能为空'
-        return
-      }
-    }
-  }
-
-  dbConfig.value = cfg
-  saveDbConfigToLocal()
-  closeDbConfig()
-}
-
-const buildDbConfigPayload = () => {
-  const cfg = dbConfig.value
-  if (!cfg.enabled) return null
-  return {
-    enabled: true,
-    server: (cfg.server || '').trim(),
-    port: Number(cfg.port) || 1433,
-    database: (cfg.database || '').trim(),
-    username: (cfg.username || '').trim(),
-    password: cfg.password || '',
-    jdbcUrl: (cfg.jdbcUrl || '').trim(),
-    allowedTables: (cfg.allowedTables || '').trim(),
-    discoverTables: cfg.discoverTables !== false
-  }
 }
 
 const ensureSession = (id) => {
@@ -584,6 +442,7 @@ const selectFeature = (feature) => {
 }
 
 const goChat = () => router.push('/chat')
+const goSettings = () => router.push('/settings')
 
 const renderMd = (content) => DOMPurify.sanitize(md.render(content || ''))
 
@@ -688,7 +547,9 @@ const handleStreamPayload = (raw, aiMessageIndex) => {
     const payload = JSON.parse(raw)
     if (STREAM_END_EVENTS.has(payload.event)) return true
     if (payload.event === 'status') {
-      statusText.value = payload.text || payload.content || ''
+      const nextStatus = payload.text || payload.content || ''
+      statusText.value = nextStatus
+      analysisSteps.value = updateAnalysisSteps(analysisSteps.value, nextStatus)
       return false
     }
     if (!payload.event || STREAM_TEXT_EVENTS.has(payload.event)) {
@@ -706,6 +567,7 @@ const finishStream = (requestId) => {
   if (streamRequestSeq.value !== requestId) return
   loading.value = false
   statusText.value = ''
+  analysisSteps.value = completeAnalysisSteps(analysisSteps.value)
   saveToLocal()
 }
 
@@ -721,13 +583,15 @@ const startAnalysisStream = async (query, history, aiMessageIndex) => {
   const requestId = ++streamRequestSeq.value
 
   try {
+    modelConfig.value = loadModelConfigFromLocal(localStorage)
     const body = {
       query,
       history,
-      dbConfig: buildDbConfigPayload()
+      dbConfig: buildDbConfigPayload(dbConfig.value),
+      modelConfig: buildModelConfigPayload(modelConfig.value)
     }
 
-    const res = await fetch(`${API_BASE}/api/ai/chat/analyze/stream`, {
+    const res = await fetch(buildApiUrl('/api/ai/chat/analyze/stream'), {
       method: 'POST',
       headers: withAuthHeaders({
         'Content-Type': 'application/json',
@@ -812,11 +676,20 @@ const sendMsg = async () => {
   }
   loading.value = true
   statusText.value = ''
+  analysisSteps.value = createInitialAnalysisSteps()
   touchSession()
   saveToLocal()
   nextTick(scrollToBottom)
 
   await startAnalysisStream(query, history, aiIndex)
+}
+
+const applyRouteQueryPrompt = () => {
+  const routeQuery = route.query.query
+  const prompt = Array.isArray(routeQuery) ? routeQuery[0] : routeQuery
+  if (!prompt || typeof prompt !== 'string') return
+  if (inputVal.value.trim()) return
+  inputVal.value = prompt.slice(0, 2000)
 }
 
 onMounted(() => {
@@ -839,6 +712,8 @@ onMounted(() => {
   } else {
     createNewChat()
   }
+
+  applyRouteQueryPrompt()
 })
 
 onBeforeUnmount(() => {
@@ -850,10 +725,10 @@ onBeforeUnmount(() => {
 .analysis-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  height: calc(100vh - 40px);
+  height: calc(100vh - 48px);
   min-height: 0;
-  gap: 20px;
-  padding: 20px;
+  gap: 24px;
+  padding: 24px;
 }
 
 .analysis-sidebar {
@@ -900,7 +775,6 @@ onBeforeUnmount(() => {
 .title-edit-btn,
 .secondary-btn,
 .send-btn,
-.db-dialog-close,
 .connection-action {
   min-height: 40px;
   padding: 0 16px;
@@ -955,21 +829,18 @@ onBeforeUnmount(() => {
 }
 
 .session-list-scroll::-webkit-scrollbar,
-.analysis-window::-webkit-scrollbar,
-.db-dialog::-webkit-scrollbar {
+.analysis-window::-webkit-scrollbar {
   width: 8px;
 }
 
 .session-list-scroll::-webkit-scrollbar-thumb,
-.analysis-window::-webkit-scrollbar-thumb,
-.db-dialog::-webkit-scrollbar-thumb {
+.analysis-window::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(100, 116, 139, 0.22);
 }
 
 .session-list-scroll::-webkit-scrollbar-thumb:hover,
-.analysis-window::-webkit-scrollbar-thumb:hover,
-.db-dialog::-webkit-scrollbar-thumb:hover {
+.analysis-window::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.34);
 }
 
@@ -1073,7 +944,6 @@ onBeforeUnmount(() => {
 .switch-btn,
 .title-edit-btn,
 .secondary-btn,
-.db-dialog-close,
 .connection-action {
   color: var(--text-primary);
   background: var(--bg-surface-2);
@@ -1087,11 +957,11 @@ onBeforeUnmount(() => {
 
 .analysis-main {
   min-width: 0;
-  height: calc(100vh - 40px);
+  height: calc(100vh - 48px);
   min-height: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 20px;
   overflow: hidden;
 }
 
@@ -1106,15 +976,14 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 22%),
     var(--bg-surface-1);
   backdrop-filter: blur(22px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.28);
   overflow: hidden;
 }
 
 .analysis-header::after,
 .connection-strip::after,
 .analysis-window::after,
-.input-panel::after,
-.db-dialog::after {
+.input-panel::after {
   content: '';
   position: absolute;
   left: 24px;
@@ -1130,7 +999,11 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  padding: 24px 26px;
+  padding: 28px 30px;
+  background:
+    linear-gradient(135deg, rgba(79, 123, 255, 0.12), transparent 52%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 20%),
+    var(--bg-surface-1);
 }
 
 .title-wrap {
@@ -1329,6 +1202,106 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 76%), var(--bg-surface-2);
   border-color: var(--border-subtle);
   box-shadow: var(--shadow-xs);
+}
+
+.analysis-step-panel {
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.analysis-step-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.analysis-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 108px;
+  padding: 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 34%),
+    var(--bg-surface-2);
+  color: var(--text-secondary);
+}
+
+.analysis-step::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.analysis-step.done {
+  border-color: rgba(30, 168, 153, 0.22);
+  background:
+    linear-gradient(180deg, rgba(30, 168, 153, 0.09), transparent 36%),
+    var(--bg-surface-2);
+}
+
+.analysis-step.active {
+  border-color: rgba(79, 123, 255, 0.34);
+  color: var(--text-primary);
+  background:
+    radial-gradient(circle at top right, rgba(79, 123, 255, 0.13), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 32%),
+    var(--bg-surface-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.analysis-step.active::after {
+  background: linear-gradient(90deg, var(--brand-500), var(--teal-500));
+}
+
+.analysis-step-index {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: rgba(148, 163, 184, 0.12);
+  font-family: var(--font-label);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.analysis-step.done .analysis-step-index,
+.analysis-step.active .analysis-step-index {
+  color: var(--text-inverse);
+  background: linear-gradient(135deg, var(--brand-500), var(--teal-500));
+}
+
+.analysis-step strong,
+.analysis-step p {
+  margin: 0;
+}
+
+.analysis-step strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.analysis-step p {
+  margin-top: 6px;
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .analysis-window {
@@ -1588,99 +1561,6 @@ textarea {
   min-width: 108px;
 }
 
-.db-dialog-mask {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(7, 12, 23, 0.48);
-  backdrop-filter: blur(10px);
-  z-index: 120;
-}
-
-.db-dialog {
-  width: min(760px, 100%);
-  max-height: 90vh;
-  overflow: auto;
-  padding: 24px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
-    var(--bg-surface-1);
-  backdrop-filter: blur(22px);
-  box-shadow: var(--shadow-lg);
-}
-
-.db-dialog-header,
-.db-dialog-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.db-dialog-header {
-  margin-bottom: 18px;
-}
-
-.db-dialog-header h3,
-.db-dialog-header p {
-  margin: 0;
-}
-
-.db-dialog-header p:last-child {
-  margin-top: 8px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.db-dialog-close {
-  width: 40px;
-  padding: 0;
-}
-
-.db-checkbox-line {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 14px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.db-form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.db-form-grid label {
-  display: grid;
-  gap: 8px;
-}
-
-.db-form-grid span {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.db-form-grid input {
-  min-height: 44px;
-  padding: 0 14px;
-}
-
-.db-full-row {
-  grid-column: 1 / -1;
-}
-
-.db-dialog-footer {
-  margin-top: 20px;
-  justify-content: flex-end;
-}
-
 .loading-dots {
   display: inline-flex;
   align-items: center;
@@ -1730,6 +1610,10 @@ textarea {
 
   .welcome-actions {
     grid-template-columns: 1fr;
+  }
+
+  .analysis-step-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1795,9 +1679,10 @@ textarea {
     width: 100%;
   }
 
-  .db-form-grid {
+  .analysis-step-list {
     grid-template-columns: 1fr;
   }
+
 }
 
 @media (max-width: 640px) {
@@ -1808,15 +1693,16 @@ textarea {
 
   .analysis-header,
   .connection-strip,
+  .analysis-step-panel,
   .analysis-window,
   .input-panel,
-  .analysis-sidebar,
-  .db-dialog {
+  .analysis-sidebar {
     border-radius: 20px;
   }
 
   .analysis-header,
   .connection-strip,
+  .analysis-step-panel,
   .analysis-window,
   .input-panel {
     padding: 16px;

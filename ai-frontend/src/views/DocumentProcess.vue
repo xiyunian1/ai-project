@@ -1,7 +1,7 @@
 <template>
   <div class="workspace-shell doc-shell">
     <WorkspaceSidebar
-      eyebrow="Document Workspace"
+      eyebrow="文档处理"
       title="文档处理"
       description="上传源文件、填写处理要求，并在同一工作区里完成预览与下载。"
       mark="DOC"
@@ -9,9 +9,9 @@
       @feature-select="selectFeature"
     />
     <main class="workspace-main doc-main">
-      <header class="ops-header surface-panel">
+      <header class="ops-header surface-panel is-hero">
         <div class="ops-header-copy">
-          <p class="brand-eyebrow">Document Workspace</p>
+          <p class="brand-eyebrow">文档工作台</p>
           <h1>文档处理</h1>
           <p>上传源文件、填写处理要求，并在同一工作区里完成预览与下载。</p>
           <div class="header-inline-meta">
@@ -61,7 +61,7 @@
         <article class="surface-panel doc-form-panel">
           <div class="panel-head">
             <div>
-              <p class="brand-eyebrow">Upload & Prompt</p>
+              <p class="brand-eyebrow">上传与要求</p>
               <h2>上传文档并填写要求</h2>
               <p class="panel-note">先选择源文件，再通过要求描述明确输出格式、摘要层级或排版目标。</p>
             </div>
@@ -131,7 +131,7 @@
         <section class="surface-panel doc-preview-panel">
           <div class="panel-head">
             <div>
-              <p class="brand-eyebrow">Preview</p>
+              <p class="brand-eyebrow">结果预览</p>
               <h2>源文件 / 处理结果</h2>
               <p class="panel-note">源文件与处理结果会在同一区域切换展示，减少来回跳转和下载试错。</p>
             </div>
@@ -194,10 +194,10 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import WorkspaceSidebar from '../components/WorkspaceSidebar.vue'
 import { clearAuthSession, withAuthHeaders } from '../utils/auth'
+import { buildApiUrl, parseJsonSafe } from '../utils/api'
 import { getCurrentTheme, toggleTheme } from '../utils/theme'
 import { getWorkspaceFeatureKeyByPath } from '../utils/workspace'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
 const SOURCE_PREVIEW_LIMIT = 5000
 const RESULT_PREVIEW_LIMIT = 5000
 const REQUEST_TIMEOUT_MS = 720000
@@ -359,7 +359,7 @@ const processDocument = async () => {
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
 
   try {
-    const response = await fetch(`${API_BASE}/api/tools/document/process`, {
+    const response = await fetch(buildApiUrl('/api/tools/document/process'), {
       method: 'POST',
       headers: withAuthHeaders(),
       body: formData,
@@ -372,7 +372,7 @@ const processDocument = async () => {
     }
 
     if (!response.ok) {
-      const data = await response.json().catch(() => null)
+      const data = await parseJsonSafe(response)
       errorMsg.value = data?.message || '文档处理失败'
       return
     }
@@ -494,7 +494,7 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  padding: 24px 26px;
+  padding: 28px 30px;
 }
 
 .ops-header-copy h1,
@@ -503,7 +503,7 @@ onBeforeUnmount(() => {
 }
 
 .ops-header-copy h1 {
-  font-size: clamp(28px, 3vw, 36px);
+  font-size: clamp(30px, 3.2vw, 40px);
   line-height: 1.12;
   letter-spacing: -0.02em;
 }
@@ -584,17 +584,17 @@ onBeforeUnmount(() => {
 .doc-brief {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  padding: 18px 20px;
+  gap: 16px;
+  padding: 20px 22px;
 }
 
 .brief-card {
   display: grid;
   gap: 6px;
-  padding: 16px 18px;
+  padding: 18px 18px;
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 26%), var(--bg-surface-2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent 26%), var(--bg-surface-2);
 }
 
 .brief-card strong,
@@ -631,7 +631,7 @@ onBeforeUnmount(() => {
 .doc-preview-panel {
   display: grid;
   gap: 16px;
-  padding: 24px;
+  padding: 26px;
 }
 
 .panel-head {

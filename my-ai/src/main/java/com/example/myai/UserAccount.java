@@ -26,6 +26,12 @@ public class UserAccount {
     @Column(nullable = false, length = 64)
     private String displayName;
 
+    @Column(nullable = false, length = 16, columnDefinition = "varchar(16) default 'USER'")
+    private String role = "USER";
+
+    @Column(nullable = false, columnDefinition = "bit default 1")
+    private Boolean enabled = true;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -34,6 +40,12 @@ public class UserAccount {
 
     @PrePersist
     public void onCreate() {
+        if (this.role == null || this.role.isBlank()) {
+            this.role = "USER";
+        }
+        if (this.enabled == null) {
+            this.enabled = true;
+        }
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
@@ -55,6 +67,12 @@ public class UserAccount {
 
     public String getDisplayName() { return displayName; }
     public void setDisplayName(String displayName) { this.displayName = displayName; }
+
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+
+    public Boolean getEnabled() { return enabled; }
+    public void setEnabled(Boolean enabled) { this.enabled = enabled; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

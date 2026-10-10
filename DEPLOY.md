@@ -47,7 +47,7 @@ sudo nano /etc/my-ai/my-ai.env
 - `DB_USERNAME`
 - `DB_PASSWORD`
 - `CORS_ALLOWED_ORIGINS`（改成你的域名）
-- `DIFY_API_KEY` 或 `DEEPSEEK_API_KEY`（按你实际使用）
+- `LLM_API_KEY`（OpenAI 兼容模型 API Key，按你实际使用）
 
 ## 3. 第二次执行（正式部署）
 

@@ -13,6 +13,7 @@ import java.util.Set;
 public class AuthInterceptor implements HandlerInterceptor {
     public static final String ATTR_USERNAME = "authUsername";
     public static final String ATTR_DISPLAY_NAME = "authDisplayName";
+    public static final String ATTR_ROLE = "authRole";
 
     private static final Set<String> PUBLIC_PATHS = Set.of(
             "/api/auth/login",
@@ -45,6 +46,11 @@ public class AuthInterceptor implements HandlerInterceptor {
             JwtService.JwtPrincipal principal = jwtService.parseToken(token);
             request.setAttribute(ATTR_USERNAME, principal.username());
             request.setAttribute(ATTR_DISPLAY_NAME, principal.displayName());
+            String role = principal.role() == null || principal.role().isBlank() ? "USER" : principal.role();
+            request.setAttribute(ATTR_ROLE, role);
+            if (requestUri.startsWith("/api/admin/") && !"ADMIN".equals(role)) {
+                return forbidden(response, "需要管理员权限");
+            }
             return true;
         } catch (JwtException | IllegalArgumentException ex) {
             return unauthorized(response, "登录已过期，请重新登录");
@@ -53,7 +59,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     private String resolveToken(HttpServletRequest request) {
         String authorization = request.getHeader("Authorization");
-        if (authorization != null && authorization.startsWith("Bearer ")) {
+        if (authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7)) {
             String token = authorization.substring(7).trim();
             return token.isEmpty() ? null : token;
         }
@@ -62,9 +68,18 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     private boolean unauthorized(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        return writeError(response, message);
+    }
+
+    private boolean forbidden(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        return writeError(response, message);
+    }
+
+    private boolean writeError(HttpServletResponse response, String message) throws IOException {
         response.setCharacterEncoding("UTF-8");
         response.setContentType("application/json;charset=UTF-8");
-        response.getWriter().write("{\"code\":401,\"message\":\"" + escapeJson(message) + "\"}");
+        response.getWriter().write("{\"code\":" + response.getStatus() + ",\"message\":\"" + escapeJson(message) + "\"}");
         return false;
     }
 

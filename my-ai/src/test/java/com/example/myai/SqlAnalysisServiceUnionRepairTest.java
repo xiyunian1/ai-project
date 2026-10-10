@@ -14,7 +14,6 @@ import static org.mockito.Mockito.mock;
 class SqlAnalysisServiceUnionRepairTest {
 
     private final SqlAnalysisService service = new SqlAnalysisService(
-            mock(SqlChatService.class),
             mock(JdbcTemplate.class),
             WebClient.builder(),
             new ObjectMapper()
@@ -153,6 +152,54 @@ class SqlAnalysisServiceUnionRepairTest {
         assertTrue(repaired.contains("SELECT TOP 20 * FROM negative_inventory FOR XML"));
         assertTrue(repaired.contains("SELECT TOP 20 * FROM imbalance_records FOR XML"));
         assertTrue(!repaired.contains("ORDER BY 库存数量 DESC"));
+    }
+
+    @Test
+    void tryRepairSql_rewritesTextColumnCastToIntComparison() throws Exception {
+        String sql = """
+                SELECT TOP 10 商品编号, 商品名称, 现有库存
+                FROM inout
+                WHERE CAST(商品编号 AS INT) = 4
+                ORDER BY 现有库存 DESC
+                """;
+
+        String repaired = invokeTryRepairSql(
+                sql,
+                new RuntimeException("在将 nvarchar 值 'TMLY4' 转换成数据类型 int 时失败。")
+        );
+
+        assertTrue(repaired.contains("CONVERT(NVARCHAR(4000), 商品编号) = N'4'"));
+        assertTrue(!repaired.toLowerCase().contains("cast(商品编号 as int)"));
+    }
+
+    @Test
+    void tryRepairSql_rewritesKnownTextColumnComparedWithNumber() throws Exception {
+        String sql = """
+                SELECT TOP 10 商品编号, 商品名称, 现有库存
+                FROM inout
+                WHERE 商品编号 = 4
+                ORDER BY 现有库存 DESC
+                """;
+
+        String repaired = invokeTryRepairSql(
+                sql,
+                new RuntimeException("在将 varchar 值 'TMLY4' 转换成数据类型 int 时失败。")
+        );
+
+        assertTrue(repaired.contains("CONVERT(NVARCHAR(4000), 商品编号) = N'4'"));
+        assertTrue(!repaired.contains("商品编号 = 4"));
+    }
+
+    @Test
+    void agentPromptWarnsAgainstCastingBusinessTextCodesToNumbers() throws Exception {
+        Method method = SqlAnalysisService.class.getDeclaredMethod("buildAgentSystemPrompt", String.class);
+        method.setAccessible(true);
+
+        String prompt = (String) method.invoke(service, "- inout: 商品编号, 商品名称, 现有库存");
+
+        assertTrue(prompt.contains("商品编号"));
+        assertTrue(prompt.contains("do not cast"));
+        assertTrue(prompt.contains("business codes"));
     }
 
     private String invokeTryRepairSql(String sql, RuntimeException ex) throws Exception {

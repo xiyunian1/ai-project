@@ -1,8 +1,7 @@
-dify:
-  api-key: test-dify-key
-  base-url: http://localhost:8080/v1
-  mock-enabled: true
-  mock-delay-ms: 10
+llm:
+  api-key:
+  base-url: https://api.deepseek.com
+  model: deepseek-chat
   request-timeout-seconds: 2
 
 spring:

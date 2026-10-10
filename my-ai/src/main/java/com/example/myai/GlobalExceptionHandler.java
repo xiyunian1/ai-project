@@ -12,6 +12,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -51,6 +52,11 @@ public class GlobalExceptionHandler {
     })
     public ResponseEntity<Map<String, Object>> handleBadRequest(Exception ex) {
         return error(HttpStatus.BAD_REQUEST, "请求参数格式错误");
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNoResourceFound(NoResourceFoundException ex) {
+        return error(HttpStatus.NOT_FOUND, "接口不存在");
     }
 
     @ExceptionHandler(Exception.class)

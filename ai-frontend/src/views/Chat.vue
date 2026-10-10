@@ -1,7 +1,7 @@
 <template>
   <div class="chat-layout">
     <WorkspaceSidebar
-      eyebrow="WMS Workspace"
+      eyebrow="智能工作台"
       title="智能工作台"
       description="统一管理对话、分析和业务入口。"
       mark="AI"
@@ -22,7 +22,7 @@
       <header class="chat-header">
         <div class="title-wrap">
           <div class="title-copy">
-            <p class="brand-eyebrow">Smart Conversation</p>
+            <p class="brand-eyebrow">智能对话</p>
             <div class="title-mainline">
               <h2 v-if="!editingTitle">{{ allSessions[currentSessionId]?.name || 'WMS 智能助手' }}</h2>
               <input
@@ -37,11 +37,11 @@
                 {{ editingTitle ? '完成编辑' : '重命名' }}
               </button>
             </div>
-            <p class="title-subline">面向仓储运营的对话式工作区，支持图片和 SQL 辅助问答。</p>
+            <p class="title-subline">面向仓储运营的对话式工作区，支持资料增强问答和业务说明整理。</p>
             <div class="header-inline-meta">
               <span class="header-annotation">会话自动保存</span>
               <span class="header-dot"></span>
-              <span class="header-annotation">{{ dbChatEnabled ? '数据库问答已开启' : '标准文本与图片问答' }}</span>
+              <span class="header-annotation">已接入资料管理知识文档</span>
               <span class="header-dot"></span>
               <span class="header-annotation">适合日常运营跟进</span>
             </div>
@@ -50,34 +50,30 @@
         <div class="header-actions">
           <div class="header-badges">
             <span class="header-pill active">对话工作区</span>
-            <span :class="['header-pill', dbChatEnabled ? 'accent' : '']">
-              {{ dbChatEnabled ? 'SQL Server 模式' : '标准问答模式' }}
-            </span>
+            <span class="header-pill">资料问答模式</span>
           </div>
-          <div class="header-tools">
-            <button class="header-btn subtle" type="button" @click="toggleProfilePanel">账号设置</button>
-            <button
-              class="header-btn icon-only"
-              type="button"
-              :title="themeMode === 'dark' ? '切换到浅色模式' : '切换到深色模式'"
-              @click="handleThemeToggle"
-            >
-              <span class="theme-toggle" aria-hidden="true"></span>
-            </button>
-          </div>
+          <button
+            class="header-btn icon-only"
+            type="button"
+            :title="themeMode === 'dark' ? '切换到浅色模式' : '切换到深色模式'"
+            @click="handleThemeToggle"
+          >
+            <span class="theme-toggle" aria-hidden="true"></span>
+          </button>
         </div>
       </header>
 
       <section ref="scrollRef" class="chat-window">
         <div v-if="chatList.length === 0" class="welcome-box">
           <div class="welcome-logo">AI</div>
-          <p class="brand-eyebrow">Conversation Deck</p>
+          <p class="brand-eyebrow">对话面板</p>
           <h1>你好，我是 WMS 助手</h1>
-          <p>你可以在这里直接推进库存、流程、异常处理和数据库问答任务。</p>
+          <p>你可以在这里推进仓储资料问答、制度解释、异常处理建议和日常运营记录整理。</p>
           <div class="welcome-ledger">
             <span class="ledger-chip">会话自动保存</span>
-            <span class="ledger-chip">支持图片输入</span>
-            <span class="ledger-chip">一键切换 SQL 问答</span>
+            <span class="ledger-chip">资料增强问答</span>
+            <span class="ledger-chip">优先根据上传资料回答</span>
+            <span class="ledger-chip">适合资料和业务问答</span>
           </div>
           <div class="welcome-actions">
             <button
@@ -126,13 +122,9 @@
           <div class="composer-status">
             <span class="composer-state">{{ loading ? '响应生成中' : '准备就绪' }}</span>
             <p class="composer-hint">
-              {{ dbChatEnabled ? '当前将优先进入数据库问答流程，适合直接追问库存与 SQL 结果。' : '当前为标准对话模式，适合文本或图片协同问答。' }}
+              当前为智能对话模式，适合文本问答、资料问答和业务说明整理；数据查询请使用“分析助手”。
             </p>
           </div>
-          <label class="db-mode-toggle">
-            <input v-model="dbChatEnabled" type="checkbox" />
-            <span>数据库问答（SQL Server）</span>
-          </label>
         </div>
 
         <div class="input-row">
@@ -151,7 +143,7 @@
           />
 
           <div class="composer-actions">
-            <button class="icon-btn" type="button" title="上传图片" @click="triggerFileSelect">🖼</button>
+            <button class="icon-btn" type="button" title="添加图片附件（当前文本模型不做图片理解）" @click="triggerFileSelect">🖼</button>
             <button
               class="send-btn"
               type="button"
@@ -169,69 +161,11 @@
         </div>
       </footer>
     </main>
-
-    <div v-if="showProfilePanel" class="profile-backdrop" @click="closeProfilePanel"></div>
-    <section v-if="showProfilePanel" class="profile-panel" @click.stop>
-      <header class="profile-header">
-        <div>
-          <h3>账号设置</h3>
-          <p>当前账号：{{ userName }}</p>
-        </div>
-        <button type="button" class="close-btn" @click="closeProfilePanel">×</button>
-      </header>
-
-      <div class="profile-scroll">
-        <div class="profile-block">
-          <h4>账号</h4>
-          <div class="profile-account-card">
-            <div class="profile-account-summary">
-              <span class="user-avatar">{{ userName.charAt(0).toUpperCase() }}</span>
-              <div class="profile-account-copy">
-                <strong>{{ userName }}</strong>
-                <span>{{ currentAccount }}</span>
-              </div>
-            </div>
-            <button type="button" class="danger-btn" @click="logout">退出登录</button>
-          </div>
-        </div>
-
-        <div class="profile-block">
-          <h4>界面模式</h4>
-          <p class="hint-text">支持浅色和深色模式切换，当前设置会按账号保留。</p>
-          <button type="button" class="secondary-btn" @click="handleThemeToggle">
-            {{ themeMode === 'dark' ? '切换到浅色模式' : '切换到深色模式' }}
-          </button>
-        </div>
-
-        <div class="profile-block">
-          <h4>修改密码</h4>
-          <input v-model="passwordForm.current" type="password" placeholder="当前密码" />
-          <input v-model="passwordForm.next" type="password" placeholder="新密码（至少 6 位）" />
-          <input
-            v-model="passwordForm.confirm"
-            type="password"
-            placeholder="确认新密码"
-            @keyup.enter="handleChangePassword"
-          />
-          <button
-            type="button"
-            class="primary-btn"
-            :disabled="passwordLoading"
-            @click="handleChangePassword"
-          >
-            {{ passwordLoading ? '保存中...' : '保存密码' }}
-          </button>
-          <p v-if="passwordError" class="error-text">{{ passwordError }}</p>
-          <p v-if="passwordSuccess" class="success-text">{{ passwordSuccess }}</p>
-        </div>
-
-      </div>
-    </section>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
@@ -243,17 +177,18 @@ import {
   clearAuthSession,
   getToken,
   isTokenValid,
+  resolveAccountKey,
   withAuthHeaders
 } from '../utils/auth'
+import { buildApiUrl, parseJsonSafe } from '../utils/api'
+import { buildModelConfigPayload, loadModelConfigFromLocal } from '../utils/modelConfig'
 import { getCurrentTheme, toggleTheme } from '../utils/theme'
 import { getWorkspaceFeatureKeyByPath } from '../utils/workspace'
 
 const router = useRouter()
 const route = useRoute()
 const md = new MarkdownIt({ breaks: true, html: false, linkify: true, typographer: true })
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
 const CHAT_STORAGE_PREFIX = 'WMS_CHATS'
-const DB_CHAT_MODE_STORAGE_PREFIX = 'WMS_DB_CHAT_MODE'
 const DEFAULT_SESSION_NAME = '新对话'
 const STREAM_TEXT_EVENTS = new Set(['text_generated', 'message', 'answer'])
 const STREAM_END_EVENTS = new Set(['workflow_completed', 'stream_end', 'message_end'])
@@ -270,64 +205,34 @@ const editTitleValue = ref('')
 const titleInput = ref(null)
 const streamAbortController = ref(null)
 const streamRequestSeq = ref(0)
-const showProfilePanel = ref(false)
-const passwordLoading = ref(false)
-const passwordError = ref('')
-const passwordSuccess = ref('')
-const passwordForm = reactive({
-  current: '',
-  next: '',
-  confirm: ''
-})
 
 const quickPrompts = [
   {
-    title: '帮我总结今天需要重点关注的库存风险',
-    desc: '适合快速开始一次运营盘点。'
+    title: '请根据资料说明低库存预警后的处理流程',
+    desc: '适合快速进入制度和处理流程问答。'
   },
   {
-    title: '入库流程里最容易出错的环节有哪些',
-    desc: '适合盘点流程异常和培训材料。'
+    title: '根据已上传资料，整理一份库存异常排查清单',
+    desc: '适合生成面向值班或交接的排查要点。'
   },
   {
-    title: '根据当前业务数据，给我一个低库存处理建议',
-    desc: '适合配合数据库问答模式使用。'
+    title: '帮我解释入库流程里最容易出错的环节',
+    desc: '适合做流程解释和业务培训说明。'
   }
 ]
 
-const normalizeAccountKey = (value) => {
-  const key = (value || '').trim()
-  return key || 'guest'
-}
-
-const resolveAccountFromToken = () => {
-  try {
-    const token = getToken()
-    if (!token) return ''
-    const parts = token.split('.')
-    if (parts.length < 2) return ''
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
-    return payload?.sub || ''
-  } catch {
-    return ''
-  }
-}
-
-const resolveAccountKey = () => {
-  return normalizeAccountKey(
-    localStorage.getItem(ACCOUNT_KEY) || resolveAccountFromToken() || localStorage.getItem(NAME_KEY) || 'guest'
-  )
-}
+const resolveCurrentAccountKey = () => resolveAccountKey({
+  account: localStorage.getItem(ACCOUNT_KEY),
+  token: getToken(),
+  name: localStorage.getItem(NAME_KEY)
+})
 
 const currentAccount = ref(
-  resolveAccountKey()
+  resolveCurrentAccountKey()
 )
 const getChatStorageKey = () => `${CHAT_STORAGE_PREFIX}_${currentAccount.value}`
-const getDbModeStorageKey = () => `${DB_CHAT_MODE_STORAGE_PREFIX}_${currentAccount.value}`
 
-const userName = ref(localStorage.getItem(NAME_KEY) || '用户')
 const activeFeature = computed(() => getWorkspaceFeatureKeyByPath(route.path))
-const dbChatEnabled = ref(localStorage.getItem(getDbModeStorageKey()) === '1')
 const allSessions = ref({})
 const currentSessionId = ref('')
 const chatList = ref([])
@@ -337,10 +242,6 @@ let remoteSaveTimer = null
 let remoteSaveInFlight = false
 let pendingSaveSessionId = ''
 
-watch(dbChatEnabled, (enabled) => {
-  localStorage.setItem(getDbModeStorageKey(), enabled ? '1' : '0')
-})
-
 const applyPrompt = (prompt) => {
   inputVal.value = prompt
 }
@@ -349,20 +250,8 @@ const handleThemeToggle = () => {
   themeMode.value = toggleTheme()
 }
 
-const setPageScrollLock = (locked) => {
-  if (typeof document === 'undefined') return
-  const overflow = locked ? 'hidden' : ''
-  document.documentElement.style.overflow = overflow
-  document.body.style.overflow = overflow
-}
-
-watch(showProfilePanel, (open) => {
-  setPageScrollLock(open)
-})
-
 const forceLogout = (message = '登录状态已失效，请重新登录') => {
   closeStream()
-  showProfilePanel.value = false
   clearAuthSession()
   if (message) window.alert(message)
   router.replace('/login')
@@ -410,7 +299,7 @@ const loadSessionSummariesFromRemote = async () => {
     const merged = {}
 
     while (page < totalPages) {
-      const res = await fetch(`${API_BASE}/api/chat/sessions?page=${page}&size=${REMOTE_PAGE_SIZE}`, {
+      const res = await fetch(buildApiUrl('/api/chat/sessions', { page, size: REMOTE_PAGE_SIZE }), {
         method: 'GET',
         headers: withAuthHeaders()
       })
@@ -421,7 +310,7 @@ const loadSessionSummariesFromRemote = async () => {
       }
       if (!res.ok) return null
 
-      const data = await res.json().catch(() => null)
+      const data = await parseJsonSafe(res)
       const items = Array.isArray(data?.items) ? data.items : []
       totalPages = Number.isFinite(Number(data?.totalPages)) ? Number(data.totalPages) : (items.length > 0 ? page + 1 : 0)
 
@@ -447,7 +336,7 @@ const loadSessionSummariesFromRemote = async () => {
 
 const loadSessionDetailFromRemote = async (sessionId) => {
   try {
-    const res = await fetch(`${API_BASE}/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(buildApiUrl(`/api/chat/sessions/${encodeURIComponent(sessionId)}`), {
       method: 'GET',
       headers: withAuthHeaders()
     })
@@ -461,7 +350,7 @@ const loadSessionDetailFromRemote = async (sessionId) => {
     }
     if (!res.ok) return null
 
-    const data = await res.json().catch(() => null)
+    const data = await parseJsonSafe(res)
     const session = data?.session
     if (!session || typeof session !== 'object') return null
     return {
@@ -495,7 +384,7 @@ const flushRemoteSave = async (force = false) => {
   remoteSaveInFlight = true
   try {
     pendingSaveSessionId = ''
-    const res = await fetch(`${API_BASE}/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(buildApiUrl(`/api/chat/sessions/${encodeURIComponent(sessionId)}`), {
       method: 'PUT',
       keepalive: force,
       headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -537,7 +426,7 @@ const scheduleRemoteSave = (sessionId = currentSessionId.value) => {
 const deleteSessionFromRemote = async (sessionId) => {
   if (!remoteSyncReady.value || !sessionId) return
   try {
-    const res = await fetch(`${API_BASE}/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(buildApiUrl(`/api/chat/sessions/${encodeURIComponent(sessionId)}`), {
       method: 'DELETE',
       headers: withAuthHeaders()
     })
@@ -565,31 +454,6 @@ const closeStream = () => {
   }
 }
 
-const clearPasswordFields = () => {
-  passwordForm.current = ''
-  passwordForm.next = ''
-  passwordForm.confirm = ''
-}
-
-const resetPasswordState = () => {
-  clearPasswordFields()
-  passwordError.value = ''
-  passwordSuccess.value = ''
-  passwordLoading.value = false
-}
-
-const toggleProfilePanel = () => {
-  showProfilePanel.value = !showProfilePanel.value
-  if (!showProfilePanel.value) {
-    resetPasswordState()
-  }
-}
-
-const closeProfilePanel = () => {
-  showProfilePanel.value = false
-  resetPasswordState()
-}
-
 const flushPendingSessionBeforeLeave = async () => {
   if (!remoteSyncReady.value || !isTokenValid()) return
   if (!pendingSaveSessionId && currentSessionId.value && allSessions.value[currentSessionId.value]) {
@@ -609,63 +473,6 @@ const selectFeature = async (feature) => {
       await flushPendingSessionBeforeLeave()
     }
     router.push(feature.route)
-    closeProfilePanel()
-  }
-}
-
-const handleChangePassword = async () => {
-  if (!ensureAuthorized()) return
-  if (!passwordForm.current || !passwordForm.next || !passwordForm.confirm) {
-    passwordError.value = '请完整填写密码信息'
-    passwordSuccess.value = ''
-    return
-  }
-  if (passwordForm.next.length < 6) {
-    passwordError.value = '新密码至少 6 位'
-    passwordSuccess.value = ''
-    return
-  }
-  if (passwordForm.next !== passwordForm.confirm) {
-    passwordError.value = '两次输入的密码不一致'
-    passwordSuccess.value = ''
-    return
-  }
-
-  passwordLoading.value = true
-  passwordError.value = ''
-  passwordSuccess.value = ''
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/change-password`, {
-      method: 'POST',
-      headers: withAuthHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({
-        currentPassword: passwordForm.current,
-        newPassword: passwordForm.next
-      })
-    })
-
-    if (res.status === 401) {
-      forceLogout()
-      return
-    }
-
-    const data = await res.json().catch(() => null)
-    if (res.ok && (!data || data.code === 200 || data.success === true)) {
-      passwordSuccess.value = '密码更新成功'
-      clearPasswordFields()
-      return
-    }
-    passwordError.value = data?.message || '修改失败'
-  } catch (error) {
-    passwordError.value = '修改密码失败，请检查后端服务'
-  } finally {
-    passwordLoading.value = false
-  }
-}
-
-const handleEsc = (event) => {
-  if (event.key === 'Escape' && showProfilePanel.value) {
-    closeProfilePanel()
   }
 }
 
@@ -736,15 +543,6 @@ const saveTitle = () => {
     saveToLocal()
   }
   editingTitle.value = false
-}
-
-const logout = async () => {
-  if (!window.confirm('确定退出登录吗？')) return
-  closeStream()
-  await flushPendingSessionBeforeLeave()
-  closeProfilePanel()
-  clearAuthSession()
-  router.replace('/login')
 }
 
 const triggerFileSelect = () => {
@@ -835,7 +633,7 @@ const sendImageMessage = async (tempImageUrl, userText, aiMessageIndex) => {
     formData.append('image', blob, 'image.jpg')
     formData.append('query', userText)
 
-    const res = await fetch(`${API_BASE}/api/ai/chat/image`, {
+    const res = await fetch(buildApiUrl('/api/ai/chat/image'), {
       method: 'POST',
       headers: withAuthHeaders(),
       body: formData
@@ -862,41 +660,6 @@ const sendImageMessage = async (tempImageUrl, userText, aiMessageIndex) => {
     setAiContent(aiMessageIndex, parsedText)
   } catch (error) {
     setAiContent(aiMessageIndex, '❌ 后端连接失败')
-  } finally {
-    loading.value = false
-    saveToLocal()
-  }
-}
-
-const sendSqlMessage = async (query, aiMessageIndex) => {
-  try {
-    if (!ensureAuthorized()) return
-
-    const res = await fetch(`${API_BASE}/api/ai/chat/sql?query=${encodeURIComponent(query)}`, {
-      method: 'GET',
-      headers: withAuthHeaders()
-    })
-
-    if (res.status === 401) {
-      forceLogout()
-      return
-    }
-
-    const data = await res.json().catch(() => null)
-    if (!res.ok) {
-      setAiContent(aiMessageIndex, data?.message || '❌ 数据库问答失败')
-      return
-    }
-
-    const answer = (data?.answer || '').toString().trim()
-    if (!answer) {
-      setAiContent(aiMessageIndex, '未查询到结果')
-      return
-    }
-
-    setAiContent(aiMessageIndex, answer)
-  } catch (error) {
-    setAiContent(aiMessageIndex, '❌ 数据库接口不可用')
   } finally {
     loading.value = false
     saveToLocal()
@@ -959,10 +722,16 @@ const startStream = async (query, aiMessageIndex) => {
   const requestId = ++streamRequestSeq.value
 
   try {
-    const url = `${API_BASE}/api/ai/chat/stream?query=${encodeURIComponent(query)}`
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: withAuthHeaders({ Accept: 'text/event-stream' }),
+    const res = await fetch(buildApiUrl('/api/ai/chat/stream'), {
+      method: 'POST',
+      headers: withAuthHeaders({
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream'
+      }),
+      body: JSON.stringify({
+        query,
+        modelConfig: buildModelConfigPayload(loadModelConfigFromLocal(localStorage))
+      }),
       signal: controller.signal
     })
 
@@ -972,7 +741,8 @@ const startStream = async (query, aiMessageIndex) => {
     }
 
     if (!res.ok || !res.body) {
-      throw new Error(`stream request failed: ${res.status}`)
+      const data = await parseJsonSafe(res)
+      throw new Error(data?.message || `stream request failed: ${res.status}`)
     }
 
     const reader = res.body.getReader()
@@ -1009,7 +779,7 @@ const startStream = async (query, aiMessageIndex) => {
     if (controller.signal.aborted) return
 
     if (!chatList.value[aiMessageIndex]?.content) {
-      setAiContent(aiMessageIndex, '❌ 流式连接失败')
+      setAiContent(aiMessageIndex, `❌ ${error?.message || '流式连接失败'}`)
     }
     if (!isTokenValid()) {
       forceLogout()
@@ -1062,22 +832,14 @@ const sendMsg = async () => {
     return
   }
 
-  if (dbChatEnabled.value) {
-    await sendSqlMessage(text, aiMessageIndex)
-    return
-  }
-
   startStream(text, aiMessageIndex)
 }
 
 onMounted(async () => {
   if (!ensureAuthorized(true)) return
-  window.addEventListener('keydown', handleEsc)
 
-  const accountFromSession = resolveAccountKey()
+  const accountFromSession = resolveCurrentAccountKey()
   currentAccount.value = accountFromSession
-  userName.value = localStorage.getItem(NAME_KEY) || accountFromSession
-  dbChatEnabled.value = localStorage.getItem(getDbModeStorageKey()) === '1'
 
   const remoteSessions = await loadSessionSummariesFromRemote()
   if (remoteSessions !== null) {
@@ -1107,8 +869,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   closeStream()
-  setPageScrollLock(false)
-  window.removeEventListener('keydown', handleEsc)
   if (!pendingSaveSessionId && currentSessionId.value && allSessions.value[currentSessionId.value]) {
     pendingSaveSessionId = currentSessionId.value
   }
@@ -1124,10 +884,10 @@ onBeforeUnmount(() => {
 .chat-layout {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  height: calc(100vh - 40px);
+  height: calc(100vh - 48px);
   min-height: 0;
-  gap: 20px;
-  padding: 20px;
+  gap: 24px;
+  padding: 24px;
 }
 
 .sidebar {
@@ -1301,21 +1061,18 @@ onBeforeUnmount(() => {
 }
 
 .session-list-scroll::-webkit-scrollbar,
-.chat-window::-webkit-scrollbar,
-.profile-scroll::-webkit-scrollbar {
+.chat-window::-webkit-scrollbar {
   width: 8px;
 }
 
 .session-list-scroll::-webkit-scrollbar-thumb,
-.chat-window::-webkit-scrollbar-thumb,
-.profile-scroll::-webkit-scrollbar-thumb {
+.chat-window::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(100, 116, 139, 0.22);
 }
 
 .session-list-scroll::-webkit-scrollbar-thumb:hover,
-.chat-window::-webkit-scrollbar-thumb:hover,
-.profile-scroll::-webkit-scrollbar-thumb:hover {
+.chat-window::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 116, 139, 0.34);
 }
 
@@ -1358,24 +1115,13 @@ onBeforeUnmount(() => {
   color: var(--rose-500);
 }
 
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  display: grid;
-  place-items: center;
-  border-radius: 10px;
-  color: var(--text-inverse);
-  background: linear-gradient(135deg, var(--brand-500), var(--teal-500));
-  font-weight: 700;
-}
-
 .main-panel {
   min-width: 0;
-  height: calc(100vh - 40px);
+  height: calc(100vh - 48px);
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 20px;
   overflow: hidden;
 }
 
@@ -1389,14 +1135,13 @@ onBeforeUnmount(() => {
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 22%),
     var(--bg-surface-1);
   backdrop-filter: blur(22px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.28);
   overflow: hidden;
 }
 
 .chat-header::after,
 .chat-window::after,
-.input-panel::after,
-.profile-panel::after {
+.input-panel::after {
   content: '';
   position: absolute;
   left: 24px;
@@ -1412,7 +1157,11 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
-  padding: 24px 26px;
+  padding: 28px 30px;
+  background:
+    linear-gradient(135deg, rgba(79, 123, 255, 0.12), transparent 52%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 20%),
+    var(--bg-surface-1);
 }
 
 .title-wrap {
@@ -1579,15 +1328,15 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 14px;
   max-width: 920px;
-  margin: 18px auto;
-  padding: 30px;
+  margin: 20px auto;
+  padding: 34px;
   border: 1px solid var(--border-subtle);
   border-radius: 28px;
   background:
     radial-gradient(circle at top right, rgba(79, 123, 255, 0.08), transparent 28%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
     var(--bg-surface-2);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .welcome-box h1,
@@ -1712,7 +1461,7 @@ onBeforeUnmount(() => {
 }
 
 .bubble {
-  padding: 15px 16px;
+  padding: 16px 18px;
   border: 1px solid var(--border-subtle);
   border-radius: 20px;
   background:
@@ -1769,7 +1518,7 @@ onBeforeUnmount(() => {
 .input-panel {
   display: grid;
   gap: 16px;
-  padding: 18px;
+  padding: 20px;
 }
 
 .composer-meta {
@@ -1814,32 +1563,13 @@ onBeforeUnmount(() => {
   align-items: flex-end;
   justify-content: space-between;
   gap: 14px;
-  padding: 12px;
+  padding: 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 24px;
+  border-radius: 26px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
     var(--bg-surface-2);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.db-mode-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.db-mode-toggle input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--brand-500);
 }
 
 textarea {
@@ -1900,167 +1630,6 @@ textarea {
   color: var(--rose-500);
   background: rgba(209, 67, 91, 0.08);
   cursor: pointer;
-}
-
-.profile-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(7, 12, 23, 0.42);
-  backdrop-filter: blur(10px);
-  z-index: 120;
-}
-
-.profile-panel {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  bottom: 20px;
-  width: min(460px, calc(100vw - 24px));
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 20px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
-    var(--bg-surface-1);
-  backdrop-filter: blur(22px);
-  box-shadow: var(--shadow-lg);
-  z-index: 121;
-}
-
-.profile-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-.profile-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.profile-header h3,
-.profile-header p,
-.profile-block h4 {
-  margin: 0;
-}
-
-.profile-header p {
-  margin-top: 8px;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.close-btn {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface-2);
-  cursor: pointer;
-}
-
-.profile-block {
-  display: grid;
-  gap: 12px;
-  margin-top: 14px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.profile-block:first-child {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
-}
-
-.profile-block input {
-  min-height: 44px;
-  padding: 0 14px;
-}
-
-.profile-account-card {
-  display: grid;
-  gap: 14px;
-  padding: 16px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 18px;
-  background: var(--bg-surface-2);
-}
-
-.profile-account-summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.profile-account-copy {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.profile-account-copy strong,
-.profile-account-copy span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.profile-account-copy strong {
-  font-size: 15px;
-  color: var(--text-primary);
-}
-
-.profile-account-copy span {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.danger-btn {
-  min-height: 42px;
-  border: 1px solid rgba(209, 67, 91, 0.18);
-  border-radius: var(--radius-md);
-  color: var(--rose-500);
-  background: rgba(209, 67, 91, 0.08);
-  cursor: pointer;
-  transition:
-    transform var(--duration-fast) var(--ease-standard),
-    background var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
-}
-
-.danger-btn:hover {
-  border-color: rgba(209, 67, 91, 0.26);
-  background: rgba(209, 67, 91, 0.12);
-}
-
-.hint-text,
-.error-text,
-.success-text {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.hint-text {
-  color: var(--text-secondary);
-}
-
-.error-text {
-  color: var(--rose-500);
-}
-
-.success-text {
-  color: var(--teal-500);
 }
 
 .loading-dots {
@@ -2178,8 +1747,7 @@ textarea {
   .chat-header,
   .chat-window,
   .input-panel,
-  .sidebar,
-  .profile-panel {
+  .sidebar {
     border-radius: 20px;
   }
 
@@ -2187,12 +1755,6 @@ textarea {
   .chat-window,
   .input-panel {
     padding: 16px;
-  }
-
-  .profile-panel {
-    top: 12px;
-    right: 12px;
-    bottom: 12px;
   }
 
   .bubble-wrap {
@@ -2209,9 +1771,5 @@ textarea {
     align-items: stretch;
   }
 
-  .db-mode-toggle {
-    width: 100%;
-    justify-content: center;
-  }
 }
 </style>

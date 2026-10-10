@@ -6,20 +6,14 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.text.PDFTextStripper;
-import org.apache.poi.hwpf.HWPFDocument;
-import org.apache.poi.hwpf.extractor.WordExtractor;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -34,7 +28,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -44,8 +37,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
@@ -56,27 +47,33 @@ public class DocumentToolController {
     private static final Logger log = LoggerFactory.getLogger(DocumentToolController.class);
     private static final int MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
     private static final int MAX_REQUIREMENT_CHARS = 2000;
-    private static final int MAX_INPUT_CHARS = 120_000;
     private static final int MAX_OUTPUT_CHARS = 300_000;
     private static final int PREVIEW_HEADER_CHARS = 2500;
 
-    private static final Set<String> TEXT_EXTENSIONS = Set.of(
-            "txt", "md", "csv", "json", "xml", "html", "htm", "yaml", "yml", "log",
-            "sql", "java", "js", "ts", "vue", "properties", "ini"
-    );
 
+    private final DocumentTextExtractor documentTextExtractor;
     private final String codexBinary;
     private final String codexModel;
     private final long codexTimeoutSeconds;
+    private final boolean rawFileEnabled;
 
+    @Autowired
     public DocumentToolController(
+            DocumentTextExtractor documentTextExtractor,
             @Value("${codex.binary:codex}") String codexBinary,
             @Value("${codex.model:gpt-5.2-codex}") String codexModel,
-            @Value("${codex.timeout-seconds:600}") long codexTimeoutSeconds
+            @Value("${codex.timeout-seconds:600}") long codexTimeoutSeconds,
+            @Value("${codex.raw-file-enabled:false}") boolean rawFileEnabled
     ) {
+        this.documentTextExtractor = documentTextExtractor;
         this.codexBinary = codexBinary;
         this.codexModel = codexModel;
         this.codexTimeoutSeconds = codexTimeoutSeconds;
+        this.rawFileEnabled = rawFileEnabled;
+    }
+
+    DocumentToolController(String codexBinary, String codexModel, long codexTimeoutSeconds) {
+        this(new DocumentTextExtractor(), codexBinary, codexModel, codexTimeoutSeconds, false);
     }
 
     @PostMapping(value = "/process", produces = MediaType.APPLICATION_OCTET_STREAM_VALUE)
@@ -100,17 +97,22 @@ public class DocumentToolController {
             cleanRequirement = cleanRequirement.substring(0, MAX_REQUIREMENT_CHARS);
         }
 
-        String sourceFileName = sanitizeFileName(file.getOriginalFilename());
+        String sourceFileName = documentTextExtractor.sanitizeFileName(file.getOriginalFilename());
         String sourceExt = getExtension(sourceFileName);
         byte[] sourceBytes = readBytes(file);
         String targetExt = resolveTargetExtension(sourceExt, cleanRequirement);
-        RawProcessAttempt rawAttempt = tryProcessWithOriginalFile(
-                sourceFileName,
-                sourceBytes,
-                targetExt,
-                cleanRequirement,
-                authUsername
-        );
+        RawProcessAttempt rawAttempt;
+        if (rawFileEnabled) {
+            rawAttempt = tryProcessWithOriginalFile(
+                    sourceFileName,
+                    sourceBytes,
+                    targetExt,
+                    cleanRequirement,
+                    authUsername
+            );
+        } else {
+            rawAttempt = new RawProcessAttempt(null, false);
+        }
 
         OutputArtifact artifact;
         String previewText;
@@ -125,10 +127,10 @@ public class DocumentToolController {
                     "Codex raw-file processing timed out after " + codexTimeoutSeconds + " seconds"
             );
         } else {
-            String sourceText = extractTextForCodex(sourceFileName, sourceExt, sourceBytes, file.getContentType());
-            String resultText = runCodex(sourceFileName, sourceText, cleanRequirement, authUsername);
+            String sourceText = documentTextExtractor.extractText(sourceFileName, sourceBytes, file.getContentType());
+            String resultText = processExtractedText(sourceFileName, sourceText, cleanRequirement, authUsername);
             if (resultText.isBlank()) {
-                throw new ApiException(HttpStatus.BAD_GATEWAY, "Codex returned empty result");
+                throw new ApiException(HttpStatus.BAD_GATEWAY, "Document processing returned empty result");
             }
             if (resultText.length() > MAX_OUTPUT_CHARS) {
                 resultText = resultText.substring(0, MAX_OUTPUT_CHARS) + "\n\n...(result truncated)";
@@ -152,6 +154,18 @@ public class DocumentToolController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(artifact.bytes());
+    }
+
+    private String processExtractedText(String sourceFileName, String sourceText, String requirement, String authUsername) {
+        StringBuilder result = new StringBuilder();
+        result.append("Processed document: ").append(sourceFileName).append("\n");
+        result.append("Requirement: ").append(requirement).append("\n");
+        if (authUsername != null && !authUsername.isBlank()) {
+            result.append("Operator: ").append(authUsername.trim()).append("\n");
+        }
+        result.append("\n");
+        result.append(sourceText == null ? "" : sourceText.trim());
+        return result.toString().trim();
     }
 
     private String runCodex(String sourceFileName, String sourceText, String requirement, String authUsername) {
@@ -311,7 +325,8 @@ public class DocumentToolController {
         command.add("exec");
         command.add("--skip-git-repo-check");
         command.add("--ephemeral");
-        command.add("--dangerously-bypass-approvals-and-sandbox");
+        command.add("--sandbox");
+        command.add("workspace-write");
         command.add("--cd");
         command.add(workDir.toString());
         command.add("--output-last-message");
@@ -359,46 +374,6 @@ public class DocumentToolController {
             prompt.append("Operator: ").append(authUsername).append("\n");
         }
         return prompt.toString();
-    }
-
-    private String extractTextForCodex(String sourceFileName, String sourceExt, byte[] sourceBytes, String contentType) {
-        String text;
-        try {
-            switch (sourceExt) {
-                case "docx":
-                    text = extractDocxText(sourceBytes);
-                    break;
-                case "doc":
-                    text = extractDocText(sourceBytes);
-                    break;
-                case "pdf":
-                    text = extractPdfText(sourceBytes);
-                    break;
-                case "xlsx":
-                case "xls":
-                    text = extractSpreadsheetText(sourceBytes);
-                    break;
-                default:
-                    if (TEXT_EXTENSIONS.contains(sourceExt) || isLikelyText(contentType, sourceBytes)) {
-                        text = decodeText(sourceBytes);
-                    } else {
-                        text = buildBinaryFallbackText(sourceFileName, sourceBytes);
-                    }
-                    break;
-            }
-        } catch (Exception ex) {
-            log.warn("Failed to extract file text, name={}, ext={}", sourceFileName, sourceExt, ex);
-            text = buildBinaryFallbackText(sourceFileName, sourceBytes);
-        }
-
-        text = normalizeText(text);
-        if (text.trim().isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Uploaded document content is empty");
-        }
-        if (text.length() > MAX_INPUT_CHARS) {
-            text = text.substring(0, MAX_INPUT_CHARS);
-        }
-        return text;
     }
 
     private OutputArtifact buildOutputArtifact(String sourceFileName, String targetExt, String resultText) {
@@ -461,46 +436,8 @@ public class DocumentToolController {
         return sourceExt;
     }
 
-    private String extractDocxText(byte[] bytes) throws IOException {
-        try (XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(bytes));
-             XWPFWordExtractor extractor = new XWPFWordExtractor(document)) {
-            return extractor.getText();
-        }
-    }
-
-    private String extractDocText(byte[] bytes) throws IOException {
-        try (HWPFDocument document = new HWPFDocument(new ByteArrayInputStream(bytes));
-             WordExtractor extractor = new WordExtractor(document)) {
-            return extractor.getText();
-        }
-    }
-
-    private String extractPdfText(byte[] bytes) throws IOException {
-        try (PDDocument document = PDDocument.load(bytes)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            return stripper.getText(document);
-        }
-    }
-
-    private String extractSpreadsheetText(byte[] bytes) throws IOException {
-        try (Workbook workbook = WorkbookFactory.create(new ByteArrayInputStream(bytes))) {
-            DataFormatter formatter = new DataFormatter();
-            StringBuilder sb = new StringBuilder();
-            for (Sheet sheet : workbook) {
-                sb.append("[Sheet] ").append(sheet.getSheetName()).append("\n");
-                for (Row row : sheet) {
-                    boolean first = true;
-                    for (Cell cell : row) {
-                        if (!first) sb.append('\t');
-                        sb.append(formatter.formatCellValue(cell));
-                        first = false;
-                    }
-                    sb.append('\n');
-                }
-                sb.append('\n');
-            }
-            return sb.toString();
-        }
+    private String extractPreviewText(byte[] bytes, String extension, String contentType) {
+        return documentTextExtractor.extractText("preview." + extension, bytes, contentType, PREVIEW_HEADER_CHARS);
     }
 
     private byte[] createDocxBytes(String text) throws IOException {
@@ -575,17 +512,17 @@ public class DocumentToolController {
         try {
             switch (extension) {
                 case "docx":
-                    return truncatePreview(normalizeText(extractDocxText(outputBytes)), PREVIEW_HEADER_CHARS);
+                    return truncatePreview(normalizeText(extractPreviewText(outputBytes, "docx", null)), PREVIEW_HEADER_CHARS);
                 case "doc":
-                    return truncatePreview(normalizeText(extractDocText(outputBytes)), PREVIEW_HEADER_CHARS);
+                    return truncatePreview(normalizeText(extractPreviewText(outputBytes, "doc", null)), PREVIEW_HEADER_CHARS);
                 case "pdf":
-                    return truncatePreview(normalizeText(extractPdfText(outputBytes)), PREVIEW_HEADER_CHARS);
+                    return truncatePreview(normalizeText(extractPreviewText(outputBytes, "pdf", null)), PREVIEW_HEADER_CHARS);
                 case "xlsx":
                 case "xls":
-                    return truncatePreview(normalizeText(extractSpreadsheetText(outputBytes)), PREVIEW_HEADER_CHARS);
+                    return truncatePreview(normalizeText(extractPreviewText(outputBytes, extension, null)), PREVIEW_HEADER_CHARS);
                 default:
-                    if (isLikelyText(null, outputBytes)) {
-                        return truncatePreview(normalizeText(decodeText(outputBytes)), PREVIEW_HEADER_CHARS);
+                    if (documentTextExtractor.isLikelyText(null, outputBytes)) {
+                        return truncatePreview(normalizeText(documentTextExtractor.decodeText(outputBytes)), PREVIEW_HEADER_CHARS);
                     }
                     return "";
             }
@@ -629,44 +566,9 @@ public class DocumentToolController {
         }
     }
 
-    private String buildBinaryFallbackText(String sourceFileName, byte[] sourceBytes) {
-        int rawLimit = Math.min(sourceBytes.length, 45_000);
-        byte[] truncated = new byte[rawLimit];
-        System.arraycopy(sourceBytes, 0, truncated, 0, rawLimit);
-        String encoded = Base64.getEncoder().encodeToString(truncated);
-        return "Binary file: " + sourceFileName + "\n"
-                + "Base64 payload (truncated):\n"
-                + encoded;
-    }
-
-    private String decodeText(byte[] sourceBytes) {
-        String text = new String(sourceBytes, StandardCharsets.UTF_8);
-        if (!text.isEmpty() && text.charAt(0) == '\uFEFF') {
-            text = text.substring(1);
-        }
-        return text;
-    }
 
     private String normalizeText(String text) {
-        return Optional.ofNullable(text).orElse("")
-                .replace("\r\n", "\n")
-                .replace('\r', '\n');
-    }
-
-    private boolean isLikelyText(String contentType, byte[] bytes) {
-        String lowerType = Optional.ofNullable(contentType).orElse("").toLowerCase(Locale.ROOT);
-        if (lowerType.startsWith("text/")) return true;
-        if (lowerType.contains("/json") || lowerType.endsWith("+json")) return true;
-        if (lowerType.contains("/xml") || lowerType.endsWith("+xml")) return true;
-
-        int inspectLength = Math.min(bytes.length, 1024);
-        int suspicious = 0;
-        for (int i = 0; i < inspectLength; i++) {
-            int b = bytes[i] & 0xFF;
-            if (b == 0) return false;
-            if (b < 9 || (b > 13 && b < 32)) suspicious++;
-        }
-        return inspectLength == 0 || suspicious < inspectLength / 10;
+        return documentTextExtractor.normalizeText(text);
     }
 
     private List<String> wrapLines(String text, int maxChars) {
@@ -720,17 +622,6 @@ public class DocumentToolController {
         }
     }
 
-    private String sanitizeFileName(String originalName) {
-        String raw = Optional.ofNullable(originalName).orElse("document.txt");
-        String safe = raw.replaceAll("[\\\\/:*?\"<>|]+", "_").trim();
-        if (safe.isEmpty()) {
-            return "document.txt";
-        }
-        if (!safe.contains(".")) {
-            return safe + ".txt";
-        }
-        return safe;
-    }
 
     private String getBaseName(String fileName) {
         int dotIndex = fileName.lastIndexOf('.');
@@ -740,11 +631,7 @@ public class DocumentToolController {
     }
 
     private String getExtension(String fileName) {
-        int dotIndex = fileName.lastIndexOf('.');
-        if (dotIndex < 0 || dotIndex == fileName.length() - 1) {
-            return "";
-        }
-        return fileName.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
+        return documentTextExtractor.getExtension(fileName);
     }
 
     private String truncatePreview(String text, int maxChars) {

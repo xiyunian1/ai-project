@@ -48,12 +48,16 @@ public class AuthController {
         }
 
         UserAccount userAccount = userOpt.get();
+        if (!Boolean.TRUE.equals(userAccount.getEnabled())) {
+            log.warn("Login failed: account disabled, username={}", username);
+            return error(HttpStatus.UNAUTHORIZED, "账号已被禁用");
+        }
         if (!passwordEncoder.matches(password, userAccount.getPasswordHash())) {
             log.warn("Login failed: password mismatch, username={}", username);
             return error(HttpStatus.UNAUTHORIZED, "账号或密码错误");
         }
 
-        String token = jwtService.generateToken(userAccount.getUsername(), userAccount.getDisplayName());
+        String token = jwtService.generateToken(userAccount.getUsername(), userAccount.getDisplayName(), userAccount.getRole());
         long expiresAt = Instant.now().toEpochMilli() + jwtService.getExpirationMs();
 
         Map<String, Object> body = okBody("登录成功");
@@ -61,6 +65,7 @@ public class AuthController {
         body.put("expiresAt", expiresAt);
         body.put("username", userAccount.getDisplayName());
         body.put("account", userAccount.getUsername());
+        body.put("role", userAccount.getRole());
 
         log.info("Login success: username={}", username);
         return ResponseEntity.ok(body);
@@ -92,7 +97,11 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<Map<String, Object>> register(@RequestBody(required = false) RegisterRequest request) {
+        return error(HttpStatus.FORBIDDEN, "请联系管理员创建账号");
+    }
+
+    private ResponseEntity<Map<String, Object>> registerLegacy(@Valid @RequestBody RegisterRequest request) {
         String username = request.getUsername().trim();
         String password = request.getPassword();
         String displayName = request.getDisplayName() == null ? "" : request.getDisplayName().trim();
@@ -105,6 +114,8 @@ public class AuthController {
         account.setUsername(username);
         account.setDisplayName(displayName.isBlank() ? username : displayName);
         account.setPasswordHash(passwordEncoder.encode(password));
+        account.setRole("USER");
+        account.setEnabled(true);
         userAccountRepository.save(account);
 
         Map<String, Object> body = new HashMap<>();

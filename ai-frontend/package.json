@@ -6,6 +6,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
+    "test": "node --test src/utils/*.test.js",
     "build:clean": "cmd /c if exist dist rmdir /s /q dist",
     "build": "npm run build:clean && npx vite build --config vite.config.js",
     "preview": "vite preview",
@@ -35,13 +36,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    },
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "http://localhost:8080/updates/"
-      }
-    ]
+    }
   },
   "dependencies": {
     "dompurify": "^3.2.6",

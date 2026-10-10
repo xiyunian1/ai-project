@@ -18,7 +18,7 @@
       <div class="session-title">功能区</div>
       <div class="sidebar-nav-grid">
         <button
-          v-for="feature in WORKSPACE_FEATURES"
+          v-for="feature in visibleFeatures"
           :key="feature.key"
           type="button"
           :class="['sidebar-nav-item', activeFeature === feature.key ? 'active' : '']"
@@ -53,7 +53,9 @@
 </template>
 
 <script setup>
-import { WORKSPACE_FEATURES, getWorkspaceFeatureBadge } from '../utils/workspace'
+import { computed } from 'vue'
+import { getCurrentRole } from '../utils/auth'
+import { getWorkspaceFeatureBadge, getWorkspaceFeaturesForRole } from '../utils/workspace'
 
 const props = defineProps({
   eyebrow: {
@@ -104,6 +106,8 @@ const props = defineProps({
 
 defineEmits(['create', 'feature-select', 'session-select', 'session-delete'])
 
+const visibleFeatures = computed(() => getWorkspaceFeaturesForRole(getCurrentRole()))
+
 const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge(props.activeFeature)
 </script>
 
@@ -114,17 +118,17 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
   height: calc(100vh - 40px);
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 22px;
+  gap: 20px;
+  padding: 24px 20px 20px;
   border: 1px solid var(--border-subtle);
   border-radius: 28px;
   overflow: hidden;
   background:
-    radial-gradient(circle at top right, rgba(79, 123, 255, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 24%),
+    radial-gradient(circle at top right, rgba(79, 123, 255, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 22%),
     var(--bg-surface-1);
   backdrop-filter: blur(22px);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .workspace-sidebar::before {
@@ -152,6 +156,8 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .brand-mark {
@@ -181,14 +187,14 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
 }
 
 .brand-copy h2 {
-  font-size: 22px;
-  line-height: 1.2;
+  font-size: 23px;
+  line-height: 1.15;
 }
 
 .brand-copy p:last-child {
   margin-top: 8px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--text-secondary);
 }
 
@@ -232,7 +238,7 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
 .session-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .session-list {
@@ -248,6 +254,7 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-tertiary);
+  opacity: 0.92;
 }
 
 .sidebar-nav-grid,
@@ -284,11 +291,11 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid transparent;
+  padding: 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
   border-radius: 16px;
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.01);
+  background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
   text-align: left;
   transition:
@@ -304,7 +311,7 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
 
 .sidebar-nav-item:hover,
 .session-item:hover {
-  border-color: var(--border-ornament);
+  border-color: rgba(79, 123, 255, 0.18);
   background: var(--bg-surface-3);
   color: var(--text-primary);
 }
@@ -312,11 +319,11 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
 .sidebar-nav-item.active,
 .session-item.active {
   color: var(--text-primary);
-  border-color: rgba(79, 123, 255, 0.22);
-  background: linear-gradient(135deg, rgba(79, 123, 255, 0.12), rgba(30, 168, 153, 0.06));
+  border-color: rgba(79, 123, 255, 0.2);
+  background: linear-gradient(135deg, rgba(79, 123, 255, 0.13), rgba(30, 168, 153, 0.05));
   box-shadow:
     inset 2px 0 0 var(--brand-500),
-    0 10px 22px rgba(17, 29, 58, 0.08);
+    0 10px 22px rgba(17, 29, 58, 0.06);
 }
 
 .sidebar-token,
@@ -324,8 +331,8 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 42px;
-  height: 28px;
+  min-width: 44px;
+  height: 30px;
   padding: 0 8px;
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
@@ -340,6 +347,7 @@ const resolveSessionBadge = () => props.sessionBadge || getWorkspaceFeatureBadge
 .sidebar-nav-label {
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .session-info {

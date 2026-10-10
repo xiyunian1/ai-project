@@ -138,6 +138,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { buildApiUrl, parseJsonSafe } from '../utils/api'
 import { getCurrentTheme, toggleTheme } from '../utils/theme'
 
 const router = useRouter()
@@ -148,7 +149,6 @@ const loading = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 const themeMode = ref(getCurrentTheme())
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081'
 
 const handleThemeToggle = () => {
   themeMode.value = toggleTheme()
@@ -182,18 +182,13 @@ const handleRegister = async () => {
   errorMsg.value = ''
   successMsg.value = ''
   try {
-    const res = await fetch(`${API_BASE}/api/auth/register`, {
+    const res = await fetch(buildApiUrl('/api/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username: account, password: password.value })
     })
 
-    let data = null
-    try {
-      data = await res.json()
-    } catch {
-      data = null
-    }
+    const data = await parseJsonSafe(res)
 
     if (res.ok && (!data || data.code === 201 || data.code === 200 || data.success === true)) {
       successMsg.value = '注册成功，请返回登录'

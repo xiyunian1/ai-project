@@ -37,11 +37,16 @@ public class JwtService {
     }
 
     public String generateToken(String username, String displayName) {
+        return generateToken(username, displayName, "USER");
+    }
+
+    public String generateToken(String username, String displayName, String role) {
         Instant now = Instant.now();
         Instant expireAt = now.plusMillis(expirationMs);
         return Jwts.builder()
                 .subject(username)
                 .claim("displayName", displayName)
+                .claim("role", role == null || role.isBlank() ? "USER" : role)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expireAt))
                 .signWith(secretKey)
@@ -56,7 +61,8 @@ public class JwtService {
                 .getPayload();
         return new JwtPrincipal(
                 claims.getSubject(),
-                claims.get("displayName", String.class)
+                claims.get("displayName", String.class),
+                claims.get("role", String.class)
         );
     }
 
@@ -64,6 +70,6 @@ public class JwtService {
         return expirationMs;
     }
 
-    public record JwtPrincipal(String username, String displayName) {
+    public record JwtPrincipal(String username, String displayName, String role) {
     }
 }

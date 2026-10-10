@@ -20,6 +20,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -38,9 +41,6 @@ class AuthApiIntegrationTests {
     @MockBean
     private ChatService chatService;
 
-    @MockBean
-    private SqlChatService sqlChatService;
-
     @BeforeEach
     void setupChatServiceMock() {
         given(chatService.chat(anyString(), anyString())).willReturn(Mono.just("ok"));
@@ -51,9 +51,6 @@ class AuthApiIntegrationTests {
                 )
         );
         given(chatService.chatWithImage(any(), anyString(), anyString())).willReturn(Mono.just("ok"));
-        given(sqlChatService.query(anyString())).willReturn(
-                new SqlChatService.SqlChatResult("db-ok", "SELECT TOP 10 ...", 0, java.util.List.of())
-        );
     }
 
     @Test
@@ -61,14 +58,7 @@ class AuthApiIntegrationTests {
         String username = "tester_" + System.currentTimeMillis();
         String password = "123456";
 
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "username", username,
-                                "password", password
-                        ))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.code").value(201));
+        createUserAsAdmin(username, password);
 
         String loginBody = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -78,6 +68,7 @@ class AuthApiIntegrationTests {
                         ))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.role").value("USER"))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -119,17 +110,129 @@ class AuthApiIntegrationTests {
     }
 
     @Test
-    void sqlChatShouldRequireAuthAndReturnResult() throws Exception {
+    void userManagementRequiresAdminAndSupportsAccountLifecycle() throws Exception {
+        String userToken = registerAndLogin("normal_" + System.currentTimeMillis(), "123456");
+
+        mockMvc.perform(get("/api/admin/users")
+                        .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+
+        String adminToken = login("admin", "123456");
+        String managedUsername = "managed_" + System.currentTimeMillis();
+
+        String createBody = mockMvc.perform(post("/api/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", managedUsername,
+                                "password", "123456",
+                                "displayName", "Managed User",
+                                "role", "USER"
+                        ))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.username").value(managedUsername))
+                .andExpect(jsonPath("$.displayName").value("Managed User"))
+                .andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long managedId = objectMapper.readTree(createBody).path("id").asLong();
+
+        mockMvc.perform(get("/api/admin/users")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.username == '" + managedUsername + "')]").exists());
+
+        mockMvc.perform(patch("/api/admin/users/{id}", managedId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayName", "Updated User",
+                                "role", "ADMIN",
+                                "enabled", false
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.displayName").value("Updated User"))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.enabled").value(false));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", managedUsername,
+                                "password", "123456"
+                        ))))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(patch("/api/admin/users/{id}", managedId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("enabled", true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enabled").value(true));
+
+        mockMvc.perform(post("/api/admin/users/{id}/reset-password", managedId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("password", "abcdef"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", managedUsername,
+                                "password", "abcdef"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+
+        mockMvc.perform(delete("/api/admin/users/{id}", managedId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(true));
+    }
+
+    @Test
+    void adminCannotDisableOrDeleteSelf() throws Exception {
+        String adminToken = login("admin", "123456");
+        JsonNode users = objectMapper.readTree(
+                mockMvc.perform(get("/api/admin/users")
+                                .header("Authorization", "Bearer " + adminToken))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString()
+        );
+        long adminId = 0L;
+        for (JsonNode user : users) {
+            if ("admin".equals(user.path("username").asText())) {
+                adminId = user.path("id").asLong();
+                break;
+            }
+        }
+        assertThat(adminId).isPositive();
+
+        mockMvc.perform(patch("/api/admin/users/{id}", adminId)
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("enabled", false))))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(delete("/api/admin/users/{id}", adminId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void legacySqlChatEndpointShouldNotExist() throws Exception {
         String username = "sql_user_" + System.currentTimeMillis();
         String password = "123456";
 
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "username", username,
-                                "password", password
-                        ))))
-                .andExpect(status().isCreated());
+        createUserAsAdmin(username, password);
 
         String token = objectMapper.readTree(
                         mockMvc.perform(post("/api/auth/login")
@@ -146,33 +249,61 @@ class AuthApiIntegrationTests {
                 .path("token").asText();
 
         mockMvc.perform(get("/api/ai/chat/sql")
-                        .param("query", "总库存"))
+                        .param("query", "stock total"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value(401));
 
         mockMvc.perform(get("/api/ai/chat/sql")
-                        .param("query", "总库存")
+                        .param("query", "stock total")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.mode").value("sqlserver"))
-                .andExpect(jsonPath("$.answer").value("db-ok"));
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void registerDuplicateShouldReturnConflict() throws Exception {
+    void authorizationSchemeShouldBeCaseInsensitive() throws Exception {
+        String username = "bearer_user_" + System.currentTimeMillis();
+        String password = "123456";
+
+        createUserAsAdmin(username, password);
+
+        String token = objectMapper.readTree(
+                        mockMvc.perform(post("/api/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(Map.of(
+                                                "username", username,
+                                                "password", password
+                                        ))))
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString()
+                )
+                .path("token").asText();
+
+        mockMvc.perform(get("/api/ai/chat/sql")
+                        .param("query", "stock total")
+                        .header("Authorization", "bearer " + token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminCreateDuplicateShouldReturnConflict() throws Exception {
         String username = "dup_" + System.currentTimeMillis();
         String body = objectMapper.writeValueAsString(Map.of(
                 "username", username,
-                "password", "123456"
+                "password", "123456",
+                "role", "USER"
         ));
+        String adminToken = login("admin", "123456");
 
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post("/api/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isCreated());
 
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post("/api/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isConflict())
@@ -180,15 +311,29 @@ class AuthApiIntegrationTests {
     }
 
     @Test
-    void registerInvalidPayloadShouldReturnBadRequest() throws Exception {
+    void publicRegistrationShouldBeDisabledAfterAdminBootstrap() throws Exception {
+        String username = "closed_register_" + System.currentTimeMillis();
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", username,
+                                "password", "123456"
+                        ))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+    }
+
+    @Test
+    void publicRegistrationInvalidPayloadStillReturnsForbidden() throws Exception {
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", "ab",
                                 "password", "12"
                         ))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value(400));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
     }
 
     @Test
@@ -197,21 +342,8 @@ class AuthApiIntegrationTests {
         String user2 = "history_u2_" + System.currentTimeMillis();
         String password = "123456";
 
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "username", user1,
-                                "password", password
-                        ))))
-                .andExpect(status().isCreated());
-
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "username", user2,
-                                "password", password
-                        ))))
-                .andExpect(status().isCreated());
+        createUserAsAdmin(user1, password);
+        createUserAsAdmin(user2, password);
 
         String token1 = objectMapper.readTree(
                         mockMvc.perform(post("/api/auth/login")
@@ -277,13 +409,7 @@ class AuthApiIntegrationTests {
         String username = "page_user_" + System.currentTimeMillis();
         String password = "123456";
 
-        mockMvc.perform(post("/api/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "username", username,
-                                "password", password
-                        ))))
-                .andExpect(status().isCreated());
+        createUserAsAdmin(username, password);
 
         String loginBody = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -328,5 +454,97 @@ class AuthApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.session.name").value("分页会话"))
                 .andExpect(jsonPath("$.session.messages[0].content").value("hello"));
+    }
+
+    @Test
+    void knowledgeDocumentApisShouldWorkPerAccount() throws Exception {
+        String username = "knowledge_user_" + System.currentTimeMillis();
+        String password = "123456";
+
+        createUserAsAdmin(username, password);
+
+        String token = objectMapper.readTree(
+                        mockMvc.perform(post("/api/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(Map.of(
+                                                "username", username,
+                                                "password", password
+                                        ))))
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString()
+                )
+                .path("token").asText();
+
+        mockMvc.perform(get("/api/settings/knowledge-documents")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        String uploadBody = mockMvc.perform(multipart("/api/settings/knowledge-documents")
+                        .file(new org.springframework.mock.web.MockMultipartFile(
+                                "file",
+                                "knowledge.txt",
+                                "text/plain",
+                                "knowledge content".getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        ))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fileName").value("knowledge.txt"))
+                .andExpect(jsonPath("$.textLength").value(17))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long documentId = objectMapper.readTree(uploadBody).path("id").asLong();
+
+        mockMvc.perform(get("/api/settings/knowledge-documents")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(documentId))
+                .andExpect(jsonPath("$[0].fileName").value("knowledge.txt"));
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/settings/knowledge-documents/{id}", documentId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(true));
+    }
+
+    private String registerAndLogin(String username, String password) throws Exception {
+        createUserAsAdmin(username, password);
+        return login(username, password);
+    }
+
+    private void createUserAsAdmin(String username, String password) throws Exception {
+        String adminToken = login("admin", "123456");
+        mockMvc.perform(post("/api/admin/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", username,
+                                "password", password,
+                                "displayName", username,
+                                "role", "USER"
+                        ))))
+                .andExpect(status().isCreated());
+    }
+
+    private String login(String username, String password) throws Exception {
+        return objectMapper.readTree(
+                        mockMvc.perform(post("/api/auth/login")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(Map.of(
+                                                "username", username,
+                                                "password", password
+                                        ))))
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString()
+                )
+                .path("token").asText();
     }
 }
