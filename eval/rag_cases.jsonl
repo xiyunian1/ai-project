@@ -1,0 +1,43 @@
+{"id": "K01", "doc": "药品入库验收规范.md", "question": "冷藏药品送到仓库后，最晚多久要验收完？", "evidence": ["冷链药品应在到货后 30 分钟内完成验收"], "keywords": [["30分钟"]], "expect": "answer"}
+{"id": "K02", "doc": "药品入库验收规范.md", "question": "一个批号到了 80 件货，验收时要抽几件？", "evidence": ["51 件至 100 件的抽 3 件"], "keywords": [["3件", "三件"]], "expect": "answer"}
+{"id": "K03", "doc": "药品入库验收规范.md", "question": "剩余效期不到一年的批次还能入库吗？需要谁同意？", "evidence": ["须经采购经理签字确认后方可入库"], "keywords": [["采购经理"]], "expect": "answer"}
+{"id": "K04", "doc": "药品入库验收规范.md", "question": "验收不合格的货放在哪里，挂什么颜色的牌子？", "evidence": ["立即移入不合格品区，挂红色标识"], "keywords": [["不合格品区"], ["红"]], "expect": "answer"}
+{"id": "K05", "doc": "药品入库验收规范.md", "question": "入库验收记录最少要保存几年？", "evidence": ["且不得少于 5 年"], "keywords": [["5年", "五年"]], "expect": "answer"}
+{"id": "K06", "doc": "效期管理制度.md", "question": "什么样的药算近效期？", "evidence": ["距有效期截止日不足 6 个月"], "keywords": [["6个月", "六个月"]], "expect": "answer"}
+{"id": "K07", "doc": "效期管理制度.md", "question": "近效期报表每个月几号之前要出？", "evidence": ["每月 5 日前出具上月末"], "keywords": [["5日", "5号", "五日"]], "expect": "answer"}
+{"id": "K08", "doc": "效期管理制度.md", "question": "离过期不到三个月的药品应该怎么处理？", "evidence": ["应停止销售，移入待处理区"], "keywords": [["停止销售"], ["待处理区"]], "expect": "answer"}
+{"id": "K09", "doc": "效期管理制度.md", "question": "仓库里发现了过期药，多长时间内要移走？", "evidence": ["应在 24 小时内移入不合格品区"], "keywords": [["24小时"]], "expect": "answer"}
+{"id": "K10", "doc": "效期管理制度.md", "question": "近效期药品搞促销，折扣最低能到多少？", "evidence": ["折扣不得低于 7 折"], "keywords": [["7折", "七折"]], "expect": "answer"}
+{"id": "K11", "doc": "温湿度与储存管理规定.md", "question": "阴凉库的温度上限是多少？", "evidence": ["阴凉库温度不超过 20℃"], "keywords": [["20℃", "20度", "20°C"]], "expect": "answer"}
+{"id": "K12", "doc": "温湿度与储存管理规定.md", "question": "冷库温度应该控制在什么范围？", "evidence": ["冷库温度应控制在 2–8℃"], "keywords": [["2"], ["8℃", "8度", "8°C"]], "expect": "answer"}
+{"id": "K13", "doc": "温湿度与储存管理规定.md", "question": "常温库每天几点记录温湿度？", "evidence": ["每日 9:00 和 15:00 各记录一次温湿度"], "keywords": [["9:00", "9点", "9：00"], ["15:00", "15点", "下午3点", "15：00"]], "expect": "answer"}
+{"id": "K14", "doc": "温湿度与储存管理规定.md", "question": "库房温湿度超标了，要在多长时间内处理？", "evidence": ["应在 30 分钟内采取通风、除湿"], "keywords": [["30分钟"]], "expect": "answer"}
+{"id": "K15", "doc": "温湿度与储存管理规定.md", "question": "药品码垛离墙至少要多远？", "evidence": ["与墙、屋顶（房梁）的距离不小于 30 厘米"], "keywords": [["30厘米", "30cm", "30公分"]], "expect": "answer"}
+{"id": "K16", "doc": "盘点管理办法.md", "question": "盘点工作谁来牵头，谁来监盘？", "evidence": ["盘点工作由仓储部主导"], "keywords": [["仓储部"], ["财务部"]], "expect": "answer"}
+{"id": "K17", "doc": "盘点管理办法.md", "question": "盘点差异多大需要二次复核？", "evidence": ["单条盘点差异数量达到 3 个及以上"], "keywords": [["3个", "3件", "三个"], ["100元"]], "expect": "answer"}
+{"id": "K18", "doc": "盘点管理办法.md", "question": "盘点差异率超过多少要交差异分析报告？", "evidence": ["超过 0.5% 的仓库"], "keywords": [["0.5%"]], "expect": "answer"}
+{"id": "K19", "doc": "盘点管理办法.md", "question": "盘点完多久要把结果录进系统？", "evidence": ["盘点结束后 2 个工作日内录入系统"], "keywords": [["2个工作日", "两个工作日"]], "expect": "answer"}
+{"id": "K20", "doc": "盘点管理办法.md", "question": "季度末盘点要盘哪些商品？", "evidence": ["每季度末对全部商品进行全盘"], "keywords": [["全部商品", "全盘"]], "expect": "answer"}
+{"id": "K21", "doc": "退货处理规范.md", "question": "客户买了药，最多几天内可以申请退货？", "evidence": ["销售出库后 15 天内提出申请"], "keywords": [["15天"]], "expect": "answer"}
+{"id": "K22", "doc": "退货处理规范.md", "question": "一张销售退货单金额多少以上要质量部审批？", "evidence": ["超过 500 元的，需质量部审批"], "keywords": [["500"]], "expect": "answer"}
+{"id": "K23", "doc": "退货处理规范.md", "question": "哪些药品不能退货？", "evidence": ["冷链药品、拆零药品、已开封使用的医疗器械不接受退货"], "keywords": [["冷链"], ["拆零"]], "expect": "answer"}
+{"id": "K24", "doc": "退货处理规范.md", "question": "退回来的药多久内要做完质检？", "evidence": ["应在 48 小时内完成质量检查"], "keywords": [["48小时"]], "expect": "answer"}
+{"id": "K25", "doc": "退货处理规范.md", "question": "向供应商退货，对方要在几天内确认？", "evidence": ["需供应商在 3 个工作日内书面确认"], "keywords": [["3个工作日", "三个工作日"]], "expect": "answer"}
+{"id": "K26", "doc": "调拨管理规定.md", "question": "中心仓什么时候给前置仓下发调拨单？", "evidence": ["中心仓每周一 10:00 前"], "keywords": [["周一", "星期一"], ["10:00", "10点", "十点", "10：00"]], "expect": "answer"}
+{"id": "K27", "doc": "调拨管理规定.md", "question": "前置仓的目标库存按几天销量算？", "evidence": ["前置仓目标库存为 12 天销量"], "keywords": [["12天"]], "expect": "answer"}
+{"id": "K28", "doc": "调拨管理规定.md", "question": "调拨单多少行以上，收货时要双人逐行复核？", "evidence": ["单张调拨单明细超过 25 行的"], "keywords": [["25"]], "expect": "answer"}
+{"id": "K29", "doc": "调拨管理规定.md", "question": "调拨的货在路上最多能走多久？", "evidence": ["调拨在途时间不超过 24 小时"], "keywords": [["24小时"]], "expect": "answer"}
+{"id": "K30", "doc": "调拨管理规定.md", "question": "前置仓库存低到什么程度可以申请紧急调拨？", "evidence": ["库存低于 2 天销量时，可申请紧急调拨"], "keywords": [["2天", "两天"]], "expect": "answer"}
+{"id": "K31", "doc": "安全库存与补货策略.md", "question": "中心仓中成药的安全库存是多少？", "evidence": ["中成药 40"], "keywords": [["40"]], "expect": "answer"}
+{"id": "K32", "doc": "安全库存与补货策略.md", "question": "补货一次补多少天的量？", "evidence": ["补货量按该商品 30 至 50 天的全公司销量确定"], "keywords": [["30"], ["50天"]], "expect": "answer"}
+{"id": "K33", "doc": "安全库存与补货策略.md", "question": "前置仓的安全库存是怎么定的？", "evidence": ["前置仓安全库存为中心仓同类别标准的 20%"], "keywords": [["20%"]], "expect": "answer"}
+{"id": "K34", "doc": "安全库存与补货策略.md", "question": "供应商断货多少天就要找替代供应商？", "evidence": ["供应商断货超过 15 天的"], "keywords": [["15天"]], "expect": "answer"}
+{"id": "K35", "doc": "安全库存与补货策略.md", "question": "感冒药这类季节性商品，旺季前安全库存怎么调整？", "evidence": ["将安全库存提高 50%"], "keywords": [["50%"]], "expect": "answer"}
+{"id": "K36", "doc": "供应商管理办法.md", "question": "A 类供应商的采购额标准是多少？", "evidence": ["年采购入库金额达到 10 万元（含）的为 A 类供应商"], "keywords": [["10万"]], "expect": "answer"}
+{"id": "K37", "doc": "供应商管理办法.md", "question": "B 类供应商多长时间评审一次？", "evidence": ["B 类供应商每半年评审一次"], "keywords": [["半年"]], "expect": "answer"}
+{"id": "K38", "doc": "供应商管理办法.md", "question": "首营企业由哪个部门审核？", "evidence": ["首营企业审核由质量部负责"], "keywords": [["质量部"]], "expect": "answer"}
+{"id": "K39", "doc": "供应商管理办法.md", "question": "供应商到货及时率低于多少会被降级？", "evidence": ["到货及时率低于 95%"], "keywords": [["95%"]], "expect": "answer"}
+{"id": "K40", "doc": "供应商管理办法.md", "question": "供应商连续几次评审不合格会被暂停合作？", "evidence": ["连续两次评审不合格的供应商暂停合作"], "keywords": [["两次", "2次"]], "expect": "answer"}
+{"id": "N01", "doc": null, "question": "公司的年终奖是怎么计算的？", "evidence": [], "keywords": [["没有找到", "未找到", "没有相关", "未提及", "没有提到", "没有明确", "没有规定", "未规定", "未涉及", "没有涉及", "无相关"]], "expect": "no_answer"}
+{"id": "N02", "doc": null, "question": "员工每年有几天年假？", "evidence": [], "keywords": [["没有找到", "未找到", "没有相关", "未提及", "没有提到", "没有明确", "没有规定", "未规定", "未涉及", "没有涉及", "无相关"]], "expect": "no_answer"}
+{"id": "N03", "doc": null, "question": "仓库的叉车多久保养一次？", "evidence": [], "keywords": [["没有找到", "未找到", "没有相关", "未提及", "没有提到", "没有明确", "没有规定", "未规定", "未涉及", "没有涉及", "无相关"]], "expect": "no_answer"}

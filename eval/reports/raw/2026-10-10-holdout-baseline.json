@@ -1,0 +1,1879 @@
+{
+ "meta": {
+  "label": "holdout-baseline",
+  "startedAt": "2026-10-10T22:35:08",
+  "model": "deepseek-flash",
+  "casesFile": "sql_cases_holdout.jsonl",
+  "concurrency": 3,
+  "agentMode": "json"
+ },
+ "results": [
+  {
+   "id": "X01",
+   "category": "lookup",
+   "question": "瑞丰药业有限公司提供哪些商品？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "瑞丰药业有限公司共提供 6 种商品：\n\n| 商品编号 | 商品名称 | 商品规格 | 商品类别 |\n| --- | --- | --- | --- |\n| YP1003 | 头孢克肟分散片 | 0.1g*6片 | 西药 |\n| YP1007 | 氯雷他定片 | 10mg*12片 | 西药 |\n| YP1010 | 维生素C片 | 0.1g*100片 | 西药 |\n| YP1012 | 左氧氟沙星片 | 0.5g*4片 | 西药 |\n| YP2002 | 连花清瘟胶囊 | 0.35g*24粒 | 中成药 |\n| YP2006 | 感冒灵颗粒 | 10g*9袋 | 中成药 |\n\n其中西药 4 种、中成药 2 种。",
+    "finalSql": "SELECT DISTINCT 商品编号, 商品名称, 商品规格, 商品类别 FROM dbo.inout WHERE 供应商名称 = ? /* params=[瑞丰药业有限公司] */",
+    "rowCount": 6,
+    "rows": [
+     {
+      "商品编号": "YP1003",
+      "商品名称": "头孢克肟分散片",
+      "商品规格": "0.1g*6片",
+      "商品类别": "西药"
+     },
+     {
+      "商品编号": "YP1007",
+      "商品名称": "氯雷他定片",
+      "商品规格": "10mg*12片",
+      "商品类别": "西药"
+     },
+     {
+      "商品编号": "YP1010",
+      "商品名称": "维生素C片",
+      "商品规格": "0.1g*100片",
+      "商品类别": "西药"
+     },
+     {
+      "商品编号": "YP1012",
+      "商品名称": "左氧氟沙星片",
+      "商品规格": "0.5g*4片",
+      "商品类别": "西药"
+     },
+     {
+      "商品编号": "YP2002",
+      "商品名称": "连花清瘟胶囊",
+      "商品规格": "0.35g*24粒",
+      "商品类别": "中成药"
+     },
+     {
+      "商品编号": "YP2006",
+      "商品名称": "感冒灵颗粒",
+      "商品规格": "10g*9袋",
+      "商品类别": "中成药"
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT DISTINCT 商品编号, 商品名称, 商品规格, 商品类别 FROM dbo.inout WHERE 供应商名称 = ? /* params=[瑞丰药业有限公司] */",
+      "reason": "供应商名称匹配商品清单",
+      "message": "",
+      "rowCount": 6,
+      "error": null,
+      "durationMs": 15
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已根据供应商名称查询到全部商品清单",
+      "message": "瑞丰药业有限公司共提供 6 种商品：\n\n| 商品编号 | 商品名称 | 商品规格 | 商品类别 |\n| --- | --- | --- | --- |\n| YP1003 | 头孢克肟分散片 | 0.1g*6片 | 西药 |\n| YP1007 | 氯雷他定片 | 10mg*12片 | 西药 |\n| YP1010 | 维生素C片 | 0.1g*100片 | 西药 |\n| YP1012 | 左氧氟沙星片 | 0.5g*4片 | 西药 |\n| YP2002 | 连花清瘟胶囊 | 0.35g*24粒 | 中成药 |\n| YP2006 | 感冒灵颗粒 | 10g*9袋 | 中成药 |\n\n其中西药 4 种、中成药 2 种。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1826,
+     "completionTokens": 458,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 2736,
+    "error": null
+   }
+  },
+  {
+   "id": "X02",
+   "category": "lookup",
+   "question": "规格是 100ml 的商品叫什么？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "规格为 100ml 的商品是：碘伏消毒液（商品编号：YP5004）。",
+    "finalSql": "SELECT DISTINCT TOP 100 商品编号, 商品名称, 商品规格 FROM dbo.inout WHERE 商品规格 LIKE ? /* params=[%100ml%] */",
+    "rowCount": 1,
+    "rows": [
+     {
+      "商品编号": "YP5004",
+      "商品名称": "碘伏消毒液",
+      "商品规格": "100ml"
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT DISTINCT TOP 100 商品编号, 商品名称, 商品规格 FROM dbo.inout WHERE 商品规格 LIKE ? /* params=[%100ml%] */",
+      "reason": "需要按规格筛选出对应商品名称",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 21
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已通过按规格筛选查询到唯一匹配商品，可直接作答。",
+      "message": "规格为 100ml 的商品是：碘伏消毒液（商品编号：YP5004）。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1653,
+     "completionTokens": 236,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 2553,
+    "error": null
+   }
+  },
+  {
+   "id": "X03",
+   "category": "lookup",
+   "question": "仁济诊所的货是从哪个仓库发出的？",
+   "ok": false,
+   "reason": "ANSWER_ONLY:结果不一致：gold 1 行，Agent 2 行",
+   "trace": {
+    "answer": "仁济诊所的货是从「长沙中心仓」发出的。\n\n统计依据：在出库记录中按客户名称「仁济诊所」筛选，共有 144 张销售出库单由长沙中心仓发货，出库数量合计约 4176；另有 12 张销售退货单也是长沙中心仓，退货数量为 0。所有单据均来自长沙中心仓，未出现其他仓库。",
+    "finalSql": "SELECT 仓库名称, 单据类型, COUNT(DISTINCT 单据编号) AS 单据数, SUM(CASE WHEN 出库数量 IS NOT NULL AND ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS FLOAT) ELSE 0 END) AS 出库数量合计 FROM dbo.inout WHERE 客户名称 = ? GROUP BY 仓库名称, 单据类型 ORDER BY 出库数量合计 DESC /* params=[仁济诊所] */",
+    "rowCount": 2,
+    "rows": [
+     {
+      "仓库名称": "长沙中心仓",
+      "单据类型": "销售出库",
+      "单据数": 144,
+      "出库数量合计": 4176.0
+     },
+     {
+      "仓库名称": "长沙中心仓",
+      "单据类型": "销售退货",
+      "单据数": 12,
+      "出库数量合计": 0.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, 单据类型, COUNT(DISTINCT 单据编号) AS 单据数, SUM(CASE WHEN 出库数量 IS NOT NULL AND ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS FLOAT) ELSE 0 END) AS 出库数量合计 FROM dbo.inout WHERE 客户名称 = ? GROUP BY 仓库名称, 单据类型 ORDER BY 出库数量合计 DESC /* params=[仁济诊所] */",
+      "reason": "按客户名称筛选出库记录，按仓库和单据类型汇总，判断实际发货仓库。",
+      "message": "",
+      "rowCount": 2,
+      "error": null,
+      "durationMs": 35
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "数据已足够回答：仁济诊所的所有发货单据均来自长沙中心仓。",
+      "message": "仁济诊所的货是从「长沙中心仓」发出的。\n\n统计依据：在出库记录中按客户名称「仁济诊所」筛选，共有 144 张销售出库单由长沙中心仓发货，出库数量合计约 4176；另有 12 张销售退货单也是长沙中心仓，退货数量为 0。所有单据均来自长沙中心仓，未出现其他仓库。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1766,
+     "completionTokens": 477,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 3365,
+    "error": null
+   }
+  },
+  {
+   "id": "X04",
+   "category": "aggregate",
+   "question": "株洲前置仓今年一共销售出库了多少件商品？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "株洲前置仓今年销售出库合计 9765 件商品。",
+    "finalSql": "SELECT SUM(CASE WHEN ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS DECIMAL(18,2)) ELSE 0 END) AS 销售出库数量 FROM dbo.inout WHERE 仓库名称 = ? AND 单据类型 LIKE ? AND YEAR(按日期) = YEAR(GETDATE()) /* params=[株洲前置仓, %销售%] */",
+    "rowCount": 1,
+    "rows": [
+     {
+      "销售出库数量": 9765.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT SUM(CASE WHEN ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS DECIMAL(18,2)) ELSE 0 END) AS 销售出库数量 FROM dbo.inout WHERE 仓库名称 = ? AND 单据类型 LIKE ? AND YEAR(按日期) = YEAR(GETDATE()) /* params=[株洲前置仓, %销售%] */",
+      "reason": "按仓库名称、销售类单据类型和今年日期汇总出库数量",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 33
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已按仓库名称='株洲前置仓'、单据类型为销售类并限定本年度汇总出库数量，结果为 9765 件。",
+      "message": "株洲前置仓今年销售出库合计 9765 件商品。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1703,
+     "completionTokens": 680,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 3923,
+    "error": null
+   }
+  },
+  {
+   "id": "X05",
+   "category": "aggregate",
+   "question": "今年采购退货一共退了多少金额？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "今年（截至当前年度）采购退货单据共有 9 张，合计退货金额为 2,750.90 元。",
+    "finalSql": "SELECT SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 退货金额, COUNT(DISTINCT 单据编号) AS 单据数 FROM dbo.inout WHERE 单据类型 LIKE '%采购退货%' AND YEAR(按日期) = YEAR(GETDATE())",
+    "rowCount": 1,
+    "rows": [
+     {
+      "退货金额": 2750.9,
+      "单据数": 9
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 退货金额, COUNT(DISTINCT 单据编号) AS 单据数 FROM dbo.inout WHERE 单据类型 LIKE '%采购退货%' AND YEAR(按日期) = YEAR(GETDATE())",
+      "reason": "统计今年单据类型为采购退货的开单金额合计",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 19
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已通过 SQL 统计今年单据类型为采购退货的开单金额合计与单据数，数据明确，可直接作答。",
+      "message": "今年（截至当前年度）采购退货单据共有 9 张，合计退货金额为 2,750.90 元。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1688,
+     "completionTokens": 537,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 3310,
+    "error": null
+   }
+  },
+  {
+   "id": "X06",
+   "category": "aggregate",
+   "question": "今年平均每张采购入库单包含几行商品明细？保留两位小数。",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "今年采购入库单平均每张包含 1.35 行商品明细。\n\n计算方式：今年（按当前年份筛选）单据类型包含“采购入库”的明细总行数 ÷ 采购入库单单据编号去重数量，结果保留两位小数。",
+    "finalSql": "SELECT CAST(COUNT(*) * 1.0 / NULLIF(COUNT(DISTINCT 单据编号), 0) AS DECIMAL(18,2)) AS 平均每单明细行数 FROM dbo.inout WHERE 单据类型 LIKE '%采购入库%' AND YEAR(按日期) = YEAR(GETDATE())",
+    "rowCount": 1,
+    "rows": [
+     {
+      "平均每单明细行数": 1.35
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT CAST(COUNT(*) * 1.0 / NULLIF(COUNT(DISTINCT 单据编号), 0) AS DECIMAL(18,2)) AS 平均每单明细行数 FROM dbo.inout WHERE 单据类型 LIKE '%采购入库%' AND YEAR(按日期) = YEAR(GETDATE())",
+      "reason": "统计今年采购入库单总明细行数除以采购入库单数量。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 43
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已通过聚合查询得到结果，可直接回答。",
+      "message": "今年采购入库单平均每张包含 1.35 行商品明细。\n\n计算方式：今年（按当前年份筛选）单据类型包含“采购入库”的明细总行数 ÷ 采购入库单单据编号去重数量，结果保留两位小数。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1696,
+     "completionTokens": 1097,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 6144,
+    "error": null
+   }
+  },
+  {
+   "id": "X07",
+   "category": "aggregate",
+   "question": "保健食品类今年的销售出库金额是多少？",
+   "ok": false,
+   "reason": "结果不一致：gold 1 行，Agent 1 行",
+   "trace": {
+    "answer": "今年保健食品类销售出库金额为 105,453.00 元（对应出库数量 1,220）。\n\n统计口径：单据类型为“销售”类，商品类别包含“保健食品”，按日期为今年。",
+    "finalSql": "SELECT SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 销售出库金额, SUM(CASE WHEN ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS DECIMAL(18,2)) ELSE 0 END) AS 出库数量 FROM dbo.inout WHERE 单据类型 LIKE '%销售%' AND 商品类别 LIKE '%保健食品%' AND YEAR(按日期) = YEAR(GETDATE())",
+    "rowCount": 1,
+    "rows": [
+     {
+      "销售出库金额": 105453.0,
+      "出库数量": 1220.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 销售出库金额, SUM(CASE WHEN ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS DECIMAL(18,2)) ELSE 0 END) AS 出库数量 FROM dbo.inout WHERE 单据类型 LIKE '%销售%' AND 商品类别 LIKE '%保健食品%' AND YEAR(按日期) = YEAR(GETDATE())",
+      "reason": "按销售单据类型和保健食品类别、本年日期汇总出库金额",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 36
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "今年保健食品类销售出库金额为 105,453.00 元（对应出库数量 1,220）。\n\n统计口径：单据类型为“销售”类，商品类别包含“保健食品”，按日期为今年。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1740,
+     "completionTokens": 616,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 3115,
+    "error": null
+   }
+  },
+  {
+   "id": "X08",
+   "category": "group_rank",
+   "question": "各仓库今年销售退货的金额分别是多少？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "今年各仓库的销售退货金额如下（按金额降序）：\n\n| 仓库名称 | 销售退货金额（元） | 退货单数 |\n|---|---|---|\n| 长沙中心仓 | 4,422.10 | 54 |\n| 株洲前置仓 | 2,922.80 | 33 |\n| 湘潭前置仓 | 2,612.20 | 22 |\n| **合计** | **9,957.10** | **109** |\n\n说明：\n- 统计口径为单据类型 = 「销售退货」，日期范围为本年（YEAR(按日期) = 当前年份）。\n- 已排除单据类型中的「采购退货」（共 9 条记录），避免混入采购口径。\n- 金额取「开单金额」字段求和。",
+    "finalSql": "SELECT 仓库名称, SUM(CASE WHEN ISNUMERIC(开单金额)=1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 销售退货金额, COUNT(DISTINCT 单据编号) AS 退货单数 FROM dbo.inout WHERE 单据类型 = '销售退货' AND YEAR(CAST(按日期 AS DATETIME)) = YEAR(GETDATE()) GROUP BY 仓库名称 ORDER BY 销售退货金额 DESC",
+    "rowCount": 3,
+    "rows": [
+     {
+      "仓库名称": "长沙中心仓",
+      "销售退货金额": 4422.1,
+      "退货单数": 54
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "销售退货金额": 2922.8,
+      "退货单数": 33
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "销售退货金额": 2612.2,
+      "退货单数": 22
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, SUM(CASE WHEN ISNUMERIC(开单金额)=1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 销售退货金额 FROM dbo.inout WHERE 单据类型 LIKE '%退货%' AND YEAR(CAST(按日期 AS DATETIME)) = YEAR(GETDATE()) GROUP BY 仓库名称 ORDER BY 销售退货金额 DESC",
+      "reason": "按仓库汇总今年销售退货金额",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 36
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT 单据类型, COUNT(*) AS 记录数 FROM dbo.inout WHERE 单据类型 LIKE '%退货%' GROUP BY 单据类型 ORDER BY 记录数 DESC",
+      "reason": "区分销售退货与采购退货等单据类型",
+      "message": "",
+      "rowCount": 2,
+      "error": null,
+      "durationMs": 29
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, SUM(CASE WHEN ISNUMERIC(开单金额)=1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 销售退货金额, COUNT(DISTINCT 单据编号) AS 退货单数 FROM dbo.inout WHERE 单据类型 = '销售退货' AND YEAR(CAST(按日期 AS DATETIME)) = YEAR(GETDATE()) GROUP BY 仓库名称 ORDER BY 销售退货金额 DESC",
+      "reason": "仅统计销售退货类型，避免混入采购退货",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 38
+     },
+     {
+      "step": 4,
+      "action": "final",
+      "sql": "",
+      "reason": "已完成按仓库汇总今年销售退货金额的统计，无需继续查询",
+      "message": "今年各仓库的销售退货金额如下（按金额降序）：\n\n| 仓库名称 | 销售退货金额（元） | 退货单数 |\n|---|---|---|\n| 长沙中心仓 | 4,422.10 | 54 |\n| 株洲前置仓 | 2,922.80 | 33 |\n| 湘潭前置仓 | 2,612.20 | 22 |\n| **合计** | **9,957.10** | **109** |\n\n说明：\n- 统计口径为单据类型 = 「销售退货」，日期范围为本年（YEAR(按日期) = 当前年份）。\n- 已排除单据类型中的「采购退货」（共 9 条记录），避免混入采购口径。\n- 金额取「开单金额」字段求和。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 4,
+     "llmErrors": 0,
+     "promptTokens": 3996,
+     "completionTokens": 1245,
+     "cachedPromptTokens": 2048
+    },
+    "latencyMs": 6808,
+    "error": null
+   }
+  },
+  {
+   "id": "X09",
+   "category": "group_rank",
+   "question": "今年销售出库金额排名前 3 的商品类别是哪些？从高到低。",
+   "ok": false,
+   "reason": "结果不一致：gold 3 行，Agent 3 行",
+   "trace": {
+    "answer": "今年销售出库金额排名前 3 的商品类别（从高到低）如下：\n\n1. 西药 —— 221,397.00 元\n2. 医疗器械 —— 201,878.00 元\n3. 中药饮片 —— 147,341.00 元\n\n说明：以上按「单据类型」为销售类单据、「按日期」为今年、汇总「开单金额」并剔除空类别后统计得出。",
+    "finalSql": "SELECT TOP 3 商品类别, SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS decimal(18,2)) ELSE 0 END) AS 销售出库金额 FROM dbo.inout WHERE 单据类型 LIKE '%销售%' AND YEAR(按日期) = YEAR(GETDATE()) AND 商品类别 IS NOT NULL GROUP BY 商品类别 ORDER BY 销售出库金额 DESC",
+    "rowCount": 3,
+    "rows": [
+     {
+      "商品类别": "西药",
+      "销售出库金额": 221397.0
+     },
+     {
+      "商品类别": "医疗器械",
+      "销售出库金额": 201878.0
+     },
+     {
+      "商品类别": "中药饮片",
+      "销售出库金额": 147341.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT TOP 3 商品类别, SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS decimal(18,2)) ELSE 0 END) AS 销售出库金额 FROM dbo.inout WHERE 单据类型 LIKE '%销售%' AND YEAR(按日期) = YEAR(GETDATE()) AND 商品类别 IS NOT NULL GROUP BY 商品类别 ORDER BY 销售出库金额 DESC",
+      "reason": "按今年、销售类单据汇总开单金额，并按商品类别降序取前 3。",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 50
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已获得今年销售出库金额前 3 的商品类别，可直接作答。",
+      "message": "今年销售出库金额排名前 3 的商品类别（从高到低）如下：\n\n1. 西药 —— 221,397.00 元\n2. 医疗器械 —— 201,878.00 元\n3. 中药饮片 —— 147,341.00 元\n\n说明：以上按「单据类型」为销售类单据、「按日期」为今年、汇总「开单金额」并剔除空类别后统计得出。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1771,
+     "completionTokens": 1003,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 4809,
+    "error": null
+   }
+  },
+  {
+   "id": "X10",
+   "category": "group_rank",
+   "question": "每个供应商分别供应几种商品？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "各供应商供应的商品种类数如下（按商品种类数降序）：\n\n1. 百草堂中药饮片有限公司：9 种\n2. 安泰医用耗材有限公司：6 种\n3. 瑞丰药业有限公司：6 种\n4. 康源医疗器械有限公司：5 种\n5. 和润健康食品有限公司：4 种\n6. 恒信生物制药有限公司：4 种\n7. 华康医药有限公司：4 种\n\n说明：统计口径为各供应商对应的不同“商品编号”去重数量（已排除供应商名称为空的记录）。",
+    "finalSql": "SELECT 供应商名称, COUNT(DISTINCT 商品编号) AS 商品种类数 FROM dbo.inout WHERE 供应商名称 IS NOT NULL AND 供应商名称 <> '' GROUP BY 供应商名称 ORDER BY 商品种类数 DESC",
+    "rowCount": 7,
+    "rows": [
+     {
+      "供应商名称": "百草堂中药饮片有限公司",
+      "商品种类数": 9
+     },
+     {
+      "供应商名称": "安泰医用耗材有限公司",
+      "商品种类数": 6
+     },
+     {
+      "供应商名称": "瑞丰药业有限公司",
+      "商品种类数": 6
+     },
+     {
+      "供应商名称": "康源医疗器械有限公司",
+      "商品种类数": 5
+     },
+     {
+      "供应商名称": "和润健康食品有限公司",
+      "商品种类数": 4
+     },
+     {
+      "供应商名称": "恒信生物制药有限公司",
+      "商品种类数": 4
+     },
+     {
+      "供应商名称": "华康医药有限公司",
+      "商品种类数": 4
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT 供应商名称, COUNT(DISTINCT 商品编号) AS 商品种类数 FROM dbo.inout WHERE 供应商名称 IS NOT NULL AND 供应商名称 <> '' GROUP BY 供应商名称 ORDER BY 商品种类数 DESC",
+      "reason": "按供应商分组统计不同商品编号数量，可直接回答每个供应商供应几种商品。",
+      "message": "",
+      "rowCount": 7,
+      "error": null,
+      "durationMs": 37
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "SQL 已返回各供应商的商品种类数，可直接汇总作答。",
+      "message": "各供应商供应的商品种类数如下（按商品种类数降序）：\n\n1. 百草堂中药饮片有限公司：9 种\n2. 安泰医用耗材有限公司：6 种\n3. 瑞丰药业有限公司：6 种\n4. 康源医疗器械有限公司：5 种\n5. 和润健康食品有限公司：4 种\n6. 恒信生物制药有限公司：4 种\n7. 华康医药有限公司：4 种\n\n说明：统计口径为各供应商对应的不同“商品编号”去重数量（已排除供应商名称为空的记录）。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1753,
+     "completionTokens": 492,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 2629,
+    "error": null
+   }
+  },
+  {
+   "id": "X11",
+   "category": "group_rank",
+   "question": "今年每个仓库各有多少个不同的客户下过销售出库单？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "今年各仓库销售出库单的不同客户数统计如下：\n\n| 仓库名称 | 不同客户数 |\n|---|---|\n| 长沙中心仓 | 4 |\n| 湘潭前置仓 | 2 |\n| 株洲前置仓 | 2 |\n\n合计来看，今年共有 3 个仓库发生了销售出库业务，其中长沙中心仓覆盖的客户最多（4 个），湘潭前置仓和株洲前置仓各为 2 个。\n\n说明：统计口径为单据类型包含“销售出库”的记录，按仓库名称分组，对客户名称做去重计数，时间范围为今年（按“按日期”的年份）。",
+    "finalSql": "SELECT 仓库名称, COUNT(DISTINCT 客户名称) AS 不同客户数 FROM dbo.inout WHERE 单据类型 LIKE '%销售出库%' AND 客户名称 IS NOT NULL AND YEAR(按日期) = YEAR(GETDATE()) GROUP BY 仓库名称",
+    "rowCount": 3,
+    "rows": [
+     {
+      "仓库名称": "长沙中心仓",
+      "不同客户数": 4
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "不同客户数": 2
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "不同客户数": 2
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, COUNT(DISTINCT 客户名称) AS 不同客户数 FROM dbo.inout WHERE 单据类型 LIKE '%销售出库%' AND 客户名称 IS NOT NULL AND YEAR(按日期) = YEAR(GETDATE()) GROUP BY 仓库名称",
+      "reason": "按仓库分组，统计今年销售出库单中不同客户名称的数量。",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 23
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已按仓库分组完成今年销售出库单不同客户数的统计，可直接给出结论。",
+      "message": "今年各仓库销售出库单的不同客户数统计如下：\n\n| 仓库名称 | 不同客户数 |\n|---|---|\n| 长沙中心仓 | 4 |\n| 湘潭前置仓 | 2 |\n| 株洲前置仓 | 2 |\n\n合计来看，今年共有 3 个仓库发生了销售出库业务，其中长沙中心仓覆盖的客户最多（4 个），湘潭前置仓和株洲前置仓各为 2 个。\n\n说明：统计口径为单据类型包含“销售出库”的记录，按仓库名称分组，对客户名称做去重计数，时间范围为今年（按“按日期”的年份）。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1713,
+     "completionTokens": 744,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 3777,
+    "error": null
+   }
+  },
+  {
+   "id": "X12",
+   "category": "aggregate",
+   "question": "今年的盘点调整里，盘亏（出库方向）的记录有多少条？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "今年（本年度）单据类型为“盘点调整”的记录共有 35 条，其中盘亏（出库方向，出库数量 > 0）的记录有 23 条。",
+    "finalSql": "SELECT 单据类型, COUNT(*) AS 总记录数, SUM(CASE WHEN CASE WHEN ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS DECIMAL(18,4)) ELSE 0 END > 0 THEN 1 ELSE 0 END) AS 出库方向记录数 FROM dbo.inout WHERE 单据类型 LIKE '%盘点%' AND YEAR(按日期) = YEAR(GETDATE()) GROUP BY 单据类型 ORDER BY 总记录数 DESC",
+    "rowCount": 1,
+    "rows": [
+     {
+      "单据类型": "盘点调整",
+      "总记录数": 35,
+      "出库方向记录数": 23
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT 单据类型, COUNT(*) AS 总记录数, SUM(CASE WHEN CASE WHEN ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS DECIMAL(18,4)) ELSE 0 END > 0 THEN 1 ELSE 0 END) AS 出库方向记录数 FROM dbo.inout WHERE 单据类型 LIKE '%盘点%' AND YEAR(按日期) = YEAR(GETDATE()) GROUP BY 单据类型 ORDER BY 总记录数 DESC",
+      "reason": "先确认今年包含“盘点”的单据类型及出库方向记录数，避免误用单据类型。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 15
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "今年（本年度）单据类型为“盘点调整”的记录共有 35 条，其中盘亏（出库方向，出库数量 > 0）的记录有 23 条。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1748,
+     "completionTokens": 3008,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 13014,
+    "error": null
+   }
+  },
+  {
+   "id": "X13",
+   "category": "time",
+   "question": "2026 年 5 月哪个客户的销售出库单数最多？",
+   "ok": false,
+   "reason": "结果不一致：gold 1 行，Agent 1 行",
+   "trace": {
+    "answer": "2026 年 5 月销售出库单数最多的客户是「济世堂药店」，共 21 张销售出库单。",
+    "finalSql": "SELECT TOP 1 客户名称, COUNT(DISTINCT 单据编号) AS 销售出库单数 FROM dbo.inout WHERE 按日期 >= ? AND 按日期 < ? AND 单据类型 LIKE ? AND 客户名称 IS NOT NULL AND 客户名称 <> '' GROUP BY 客户名称 ORDER BY COUNT(DISTINCT 单据编号) DESC /* params=[2026-05-01, 2026-06-01, %销售%] */",
+    "rowCount": 1,
+    "rows": [
+     {
+      "客户名称": "济世堂药店",
+      "销售出库单数": 21
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT TOP 1 客户名称, COUNT(DISTINCT 单据编号) AS 销售出库单数 FROM dbo.inout WHERE 按日期 >= ? AND 按日期 < ? AND 单据类型 LIKE ? AND 客户名称 IS NOT NULL AND 客户名称 <> '' GROUP BY 客户名称 ORDER BY COUNT(DISTINCT 单据编号) DESC /* params=[2026-05-01, 2026-06-01, %销售%] */",
+      "reason": "按客户统计 2026 年 5 月销售类单据的不同单据编号数量，并取第一名。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 36
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已按客户统计 2026 年 5 月的销售类单据编号去重数量并取第一名。",
+      "message": "2026 年 5 月销售出库单数最多的客户是「济世堂药店」，共 21 张销售出库单。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1740,
+     "completionTokens": 976,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 5198,
+    "error": null
+   }
+  },
+  {
+   "id": "X14",
+   "category": "time",
+   "question": "2026 年 6 月的采购入库金额是多少？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "2026 年 6 月的采购入库金额为 69,453.10 元。\n\n统计口径：按日期在 2026-06-01（含）至 2026-07-01（不含）之间，且单据类型包含“采购入库”的记录，对开单金额求和。",
+    "finalSql": "SELECT SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS decimal(18,2)) ELSE 0 END) AS 采购入库金额 FROM dbo.inout WHERE 按日期 >= ? AND 按日期 < ? AND 单据类型 LIKE ? /* params=[2026-06-01, 2026-07-01, %采购入库%] */",
+    "rowCount": 1,
+    "rows": [
+     {
+      "采购入库金额": 69453.1
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS decimal(18,2)) ELSE 0 END) AS 采购入库金额 FROM dbo.inout WHERE 按日期 >= ? AND 按日期 < ? AND 单据类型 LIKE ? /* params=[2026-06-01, 2026-07-01, %采购入库%] */",
+      "reason": "按 2026 年 6 月及采购入库单据类型汇总开单金额。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 27
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已按 2026 年 6 月及采购入库单据类型汇总开单金额，结果明确。",
+      "message": "2026 年 6 月的采购入库金额为 69,453.10 元。\n\n统计口径：按日期在 2026-06-01（含）至 2026-07-01（不含）之间，且单据类型包含“采购入库”的记录，对开单金额求和。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1709,
+     "completionTokens": 1519,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 6708,
+    "error": null
+   }
+  },
+  {
+   "id": "X15",
+   "category": "time",
+   "question": "今年第三季度销售出库金额最高的商品是哪个？",
+   "ok": false,
+   "reason": "ANSWER_ONLY:结果不一致：gold 1 行，Agent 5 行",
+   "trace": {
+    "answer": "今年（2026年）第三季度（7月1日—9月30日）销售出库金额最高的商品是：**血糖试纸（商品编号 YP4003）**，销售出库金额为 **15,872.00** 元。\n\n其后的排名为：枸杞子（YP3003）15,145.00 元、电子血压计（YP4001）13,797.00 元、医用雾化器（YP4004）12,857.00 元、蛋白粉（YP6003）11,692.00 元。",
+    "finalSql": "SELECT TOP 5 商品编号, 商品名称, SUM(CAST(开单金额 AS DECIMAL(18,2))) AS 销售金额 FROM dbo.inout WHERE 按日期 >= ? AND 按日期 <= ? AND 单据类型 = ? GROUP BY 商品编号, 商品名称 ORDER BY 销售金额 DESC /* params=[2026-07-01, 2026-09-30, 销售出库] */",
+    "rowCount": 5,
+    "rows": [
+     {
+      "商品编号": "YP4003",
+      "商品名称": "血糖试纸",
+      "销售金额": 15872.0
+     },
+     {
+      "商品编号": "YP3003",
+      "商品名称": "枸杞子",
+      "销售金额": 15145.0
+     },
+     {
+      "商品编号": "YP4001",
+      "商品名称": "电子血压计",
+      "销售金额": 13797.0
+     },
+     {
+      "商品编号": "YP4004",
+      "商品名称": "医用雾化器",
+      "销售金额": 12857.0
+     },
+     {
+      "商品编号": "YP6003",
+      "商品名称": "蛋白粉",
+      "销售金额": 11692.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT TOP 10 按日期, 单据类型, 单据编号, 商品编号, 商品名称, 出库数量, 开单金额 FROM dbo.inout ORDER BY 按日期 DESC",
+      "reason": "需要确认日期字段格式、最新年份以及销售相关单据类型。",
+      "message": "",
+      "rowCount": 10,
+      "error": null,
+      "durationMs": 14
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT TOP 5 商品编号, 商品名称, SUM(CAST(开单金额 AS DECIMAL(18,2))) AS 销售金额 FROM dbo.inout WHERE 按日期 >= ? AND 按日期 <= ? AND 单据类型 LIKE ? GROUP BY 商品编号, 商品名称 ORDER BY 销售金额 DESC /* params=[2026-07-01, 2026-09-30, %销售%] */",
+      "reason": "按商品汇总第三季度销售出库金额并降序取第一。",
+      "message": "",
+      "rowCount": 5,
+      "error": null,
+      "durationMs": 18
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT TOP 5 商品编号, 商品名称, SUM(CAST(开单金额 AS DECIMAL(18,2))) AS 销售金额 FROM dbo.inout WHERE 按日期 >= ? AND 按日期 <= ? AND 单据类型 = ? GROUP BY 商品编号, 商品名称 ORDER BY 销售金额 DESC /* params=[2026-07-01, 2026-09-30, 销售出库] */",
+      "reason": "之前使用 LIKE '%销售%' 可能包含其他销售单据类型，改用精确匹配“销售出库”以符合问题要求。",
+      "message": "",
+      "rowCount": 5,
+      "error": null,
+      "durationMs": 11
+     },
+     {
+      "step": 4,
+      "action": "final",
+      "sql": "",
+      "reason": "已按 2026 年第三季度、单据类型为“销售出库”汇总各商品开单金额并降序排序，血糖试纸金额最高。",
+      "message": "今年（2026年）第三季度（7月1日—9月30日）销售出库金额最高的商品是：**血糖试纸（商品编号 YP4003）**，销售出库金额为 **15,872.00** 元。\n\n其后的排名为：枸杞子（YP3003）15,145.00 元、电子血压计（YP4001）13,797.00 元、医用雾化器（YP4004）12,857.00 元、蛋白粉（YP6003）11,692.00 元。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 4,
+     "llmErrors": 0,
+     "promptTokens": 5788,
+     "completionTokens": 2176,
+     "cachedPromptTokens": 2048
+    },
+    "latencyMs": 11002,
+    "error": null
+   }
+  },
+  {
+   "id": "X16",
+   "category": "time",
+   "question": "感冒灵颗粒 1 月到 3 月每个月的销售出库数量分别是多少？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "感冒灵颗粒 1 月至 3 月的销售出库数量如下：\n\n- 1 月：270\n- 2 月：274\n- 3 月：191\n\n（数据对应年份为 2026 年，统计口径为单据类型含“销售”的出库记录。）",
+    "finalSql": "SELECT YEAR(按日期) AS 年份, MONTH(按日期) AS 月份, SUM(CASE WHEN ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS DECIMAL(18,2)) ELSE 0 END) AS 销售出库数量 FROM dbo.inout WHERE 商品名称 = N'感冒灵颗粒' AND 单据类型 LIKE N'%销售%' AND MONTH(按日期) BETWEEN 1 AND 3 GROUP BY YEAR(按日期), MONTH(按日期) ORDER BY 年份, 月份",
+    "rowCount": 3,
+    "rows": [
+     {
+      "年份": 2026,
+      "月份": 1,
+      "销售出库数量": 270.0
+     },
+     {
+      "年份": 2026,
+      "月份": 2,
+      "销售出库数量": 274.0
+     },
+     {
+      "年份": 2026,
+      "月份": 3,
+      "销售出库数量": 191.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT YEAR(按日期) AS 年份, MONTH(按日期) AS 月份, SUM(CASE WHEN ISNUMERIC(出库数量) = 1 THEN CAST(出库数量 AS DECIMAL(18,2)) ELSE 0 END) AS 销售出库数量 FROM dbo.inout WHERE 商品名称 = N'感冒灵颗粒' AND 单据类型 LIKE N'%销售%' AND MONTH(按日期) BETWEEN 1 AND 3 GROUP BY YEAR(按日期), MONTH(按日期) ORDER BY 年份, 月份",
+      "reason": "按年份和月份汇总感冒灵颗粒的销售出库数量，避免遗漏年份条件。",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 18
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "感冒灵颗粒 1 月至 3 月的销售出库数量如下：\n\n- 1 月：270\n- 2 月：274\n- 3 月：191\n\n（数据对应年份为 2026 年，统计口径为单据类型含“销售”的出库记录。）",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1804,
+     "completionTokens": 1544,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 6976,
+    "error": null
+   }
+  },
+  {
+   "id": "X17",
+   "category": "time",
+   "question": "最近一次销售退货发生在哪一天？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "最近一次销售退货发生在 2026-09-28。",
+    "finalSql": "SELECT TOP 1 按日期 FROM dbo.inout WHERE 单据类型 LIKE '%销售退货%' ORDER BY 按日期 DESC",
+    "rowCount": 1,
+    "rows": [
+     {
+      "按日期": "2026-09-28"
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT TOP 1 按日期 FROM dbo.inout WHERE 单据类型 LIKE '%销售退货%' ORDER BY 按日期 DESC",
+      "reason": "需要从单据类型中筛选销售退货，并按日期倒序取最近一天。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 9
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已按单据类型筛选销售退货并按日期倒序取得最近一天。",
+      "message": "最近一次销售退货发生在 2026-09-28。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1640,
+     "completionTokens": 498,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 3129,
+    "error": null
+   }
+  },
+  {
+   "id": "X18",
+   "category": "time",
+   "question": "2026 年 9 月 30 日当天有多少张销售出库单？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "2026 年 9 月 30 日当天共有 6 张销售出库单。",
+    "finalSql": "SELECT COUNT(DISTINCT 单据编号) AS 销售出库单数量 FROM dbo.inout WHERE 按日期 = ? AND 单据类型 LIKE ? /* params=[2026-09-30, %销售出库%] */",
+    "rowCount": 1,
+    "rows": [
+     {
+      "销售出库单数量": 6
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT COUNT(DISTINCT 单据编号) AS 销售出库单数量 FROM dbo.inout WHERE 按日期 = ? AND 单据类型 LIKE ? /* params=[2026-09-30, %销售出库%] */",
+      "reason": "按指定日期和销售出库单类型统计去重单据编号数量。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 31
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已按日期和销售出库单类型统计去重单据编号数量，结果为 6。",
+      "message": "2026 年 9 月 30 日当天共有 6 张销售出库单。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1682,
+     "completionTokens": 427,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 2790,
+    "error": null
+   }
+  },
+  {
+   "id": "X19",
+   "category": "inventory",
+   "question": "湘潭前置仓当前库存最多的 3 个商品是哪些？从多到少。",
+   "ok": false,
+   "reason": "结果不一致：gold 3 行，Agent 3 行",
+   "trace": {
+    "answer": "湘潭前置仓当前库存最多的 3 个商品如下（按当前库存从多到少）：\n\n| 排名 | 商品编号 | 商品名称 | 商品规格 | 当前库存 |\n|------|----------|----------|----------|----------|\n| 1 | YP5001 | 医用外科口罩 | 10只/包 | 86 |\n| 2 | YP1002 | 布洛芬缓释胶囊 | 0.3g*20粒 | 51 |\n| 3 | YP1001 | 阿莫西林胶囊 | 0.25g*24粒 | 46 |\n\n说明：当前库存按各商品各批次的“库存数量”取最新一条记录后汇总得到（该字段为批次级库存余额）。",
+    "finalSql": "WITH latest AS (SELECT 商品编号, 商品名称, 商品规格, 批号, 库存数量, ROW_NUMBER() OVER (PARTITION BY 商品编号, 批号 ORDER BY 按日期 DESC, id DESC) AS rn FROM dbo.inout WHERE 仓库名称 = ?) SELECT TOP 3 商品编号, 商品名称, 商品规格, SUM(库存数量) AS 当前库存 FROM latest WHERE rn = 1 GROUP BY 商品编号, 商品名称, 商品规格 ORDER BY 当前库存 DESC /* params=[湘潭前置仓] */",
+    "rowCount": 3,
+    "rows": [
+     {
+      "商品编号": "YP5001",
+      "商品名称": "医用外科口罩",
+      "商品规格": "10只/包",
+      "当前库存": 86.0
+     },
+     {
+      "商品编号": "YP1002",
+      "商品名称": "布洛芬缓释胶囊",
+      "商品规格": "0.3g*20粒",
+      "当前库存": 51.0
+     },
+     {
+      "商品编号": "YP1001",
+      "商品名称": "阿莫西林胶囊",
+      "商品规格": "0.25g*24粒",
+      "当前库存": 46.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT TOP 20 id, 按日期, 单据类型, 单据编号, 商品编号, 商品名称, 商品规格, 批号, 入库数量, 出库数量, 库存数量, 现有库存 FROM dbo.inout WHERE 仓库名称 = ? ORDER BY 按日期 DESC, id DESC /* params=[湘潭前置仓] */",
+      "reason": "需要确认现有库存是行级流水还是库存快照，以便正确汇总当前库存。",
+      "message": "",
+      "rowCount": 20,
+      "error": null,
+      "durationMs": 17
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "WITH latest AS (SELECT 商品编号, 商品名称, 商品规格, 批号, 库存数量, ROW_NUMBER() OVER (PARTITION BY 商品编号, 批号 ORDER BY 按日期 DESC, id DESC) AS rn FROM dbo.inout WHERE 仓库名称 = ?) SELECT TOP 3 商品编号, 商品名称, 商品规格, SUM(库存数量) AS 当前库存 FROM latest WHERE rn = 1 GROUP BY 商品编号, 商品名称, 商品规格 ORDER BY 当前库存 DESC /* params=[湘潭前置仓] */",
+      "reason": "库存数量为批次级流水余额，取各批次最新行再按商品汇总得到当前库存。",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 20
+     },
+     {
+      "step": 3,
+      "action": "final",
+      "sql": "",
+      "reason": "已按批次最新库存余额并汇总到商品，得到库存最多的前 3 个商品。",
+      "message": "湘潭前置仓当前库存最多的 3 个商品如下（按当前库存从多到少）：\n\n| 排名 | 商品编号 | 商品名称 | 商品规格 | 当前库存 |\n|------|----------|----------|----------|----------|\n| 1 | YP5001 | 医用外科口罩 | 10只/包 | 86 |\n| 2 | YP1002 | 布洛芬缓释胶囊 | 0.3g*20粒 | 51 |\n| 3 | YP1001 | 阿莫西林胶囊 | 0.25g*24粒 | 46 |\n\n说明：当前库存按各商品各批次的“库存数量”取最新一条记录后汇总得到（该字段为批次级库存余额）。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 3,
+     "llmErrors": 0,
+     "promptTokens": 6447,
+     "completionTokens": 3429,
+     "cachedPromptTokens": 1536
+    },
+    "latencyMs": 15529,
+    "error": null
+   }
+  },
+  {
+   "id": "X20",
+   "category": "inventory",
+   "question": "截至 2026 年 3 月 31 日，株洲前置仓医用外科口罩的库存是多少？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "截至 2026 年 3 月 31 日，株洲前置仓「医用外科口罩」（商品编号 YP5001，规格 10只/包）的库存为 50 包。\n\n核算依据：\n- 该仓该商品截至 2026-03-31 的累计净入库量（入库合计 − 出库合计）为 50。\n- 与最近一笔记录（2026-03-30 调拨入库 50，批号 260118C）的库存数量 50 一致，两种口径相互印证。\n- 按批号看：批号 260118C 余 50，批号 251022B 余 0，合计 50。",
+    "finalSql": "SELECT SUM(CASE WHEN 入库数量 IS NULL THEN 0 ELSE CAST(入库数量 AS DECIMAL(18,2)) END) - SUM(CASE WHEN 出库数量 IS NULL THEN 0 ELSE CAST(出库数量 AS DECIMAL(18,2)) END) AS 净库存 FROM dbo.inout WHERE 仓库名称 = ? AND 商品名称 LIKE ? AND 按日期 <= ? /* params=[株洲前置仓, %医用外科口罩%, 2026-03-31] */",
+    "rowCount": 1,
+    "rows": [
+     {
+      "净库存": 50.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT TOP 50 按日期, 单据类型, 单据编号, 仓库名称, 商品编号, 商品名称, 商品规格, 批号, 入库数量, 出库数量, 库存数量, 现有库存, 有效期至 FROM dbo.inout WHERE 仓库名称 = ? AND 商品名称 LIKE ? AND 按日期 <= ? ORDER BY 按日期 DESC, id DESC /* params=[株洲前置仓, %医用外科口罩%, 2026-03-31] */",
+      "reason": "查看该仓库该商品截至指定日期的最近库存记录，以确定库存字段与口径。",
+      "message": "",
+      "rowCount": 11,
+      "error": null,
+      "durationMs": 29
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT SUM(CASE WHEN 入库数量 IS NULL THEN 0 ELSE CAST(入库数量 AS DECIMAL(18,2)) END) - SUM(CASE WHEN 出库数量 IS NULL THEN 0 ELSE CAST(出库数量 AS DECIMAL(18,2)) END) AS 净库存 FROM dbo.inout WHERE 仓库名称 = ? AND 商品名称 LIKE ? AND 按日期 <= ? /* params=[株洲前置仓, %医用外科口罩%, 2026-03-31] */",
+      "reason": "用净入库量核算截至目标日期的库存，交叉验证最新记录中的库存数量。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 27
+     },
+     {
+      "step": 3,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "截至 2026 年 3 月 31 日，株洲前置仓「医用外科口罩」（商品编号 YP5001，规格 10只/包）的库存为 50 包。\n\n核算依据：\n- 该仓该商品截至 2026-03-31 的累计净入库量（入库合计 − 出库合计）为 50。\n- 与最近一笔记录（2026-03-30 调拨入库 50，批号 260118C）的库存数量 50 一致，两种口径相互印证。\n- 按批号看：批号 260118C 余 50，批号 251022B 余 0，合计 50。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 3,
+     "llmErrors": 0,
+     "promptTokens": 5069,
+     "completionTokens": 2593,
+     "cachedPromptTokens": 1536
+    },
+    "latencyMs": 11460,
+    "error": null
+   }
+  },
+  {
+   "id": "X21",
+   "category": "inventory",
+   "question": "当前还有库存、且有效期在 2027 年 6 月 30 日之前的批次有多少个？（按仓库、商品、批号组合计数）",
+   "ok": false,
+   "reason": "运行出错: Analysis failed: Only SELECT queries are allowed.",
+   "trace": {
+    "answer": "",
+    "finalSql": "",
+    "rowCount": 0,
+    "rows": [],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'inout' AND COLUMN_NAME IN ('现有库存','库存数量','有效期至','仓库名称','商品编号','批号') ORDER BY COLUMN_NAME",
+      "reason": "确认库存和有效期字段类型，避免类型转换错误",
+      "message": "",
+      "rowCount": 6,
+      "error": null,
+      "durationMs": 67
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT TOP 10 有效期至 FROM inout WHERE 有效期至 IS NOT NULL AND 有效期至 <> '' ORDER BY 有效期至",
+      "reason": "确认有效期至的字符串格式，以便正确比较日期",
+      "message": "",
+      "rowCount": 10,
+      "error": null,
+      "durationMs": 40
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": ";WITH Latest AS (\n  SELECT 仓库名称, 商品编号, 批号, 现有库存, 有效期至,\n         ROW_NUMBER() OVER (PARTITION BY 仓库名称, 商品编号, 批号 ORDER BY 按日期 DESC, id DESC) AS rn\n  FROM inout\n  WHERE 批号 IS NOT NULL AND 批号 <> ''\n    AND 仓库名称 IS NOT NULL AND 仓库名称 <> ''\n    AND 商品编号 IS NOT NULL AND 商品编号 <> ''\n)\nSELECT\n  (SELECT COUNT(DISTINCT 仓库名称 + '|' + 商品编号 + '|' + 批号)\n   FROM inout\n   WHERE 现有库存 > 0\n     AND 有效期至 IS NOT NULL AND 有效期至 <> ''\n     AND 有效期至 < '2027-06-30'\n     AND 批号 IS NOT NULL AND 批号 <> ''\n     AND 仓库名称 IS NOT NULL AND 仓库名称 <> ''\n     AND 商品编号 IS NOT NULL AND 商品编号 <> ''\n  ) AS SimpleCount,\n  (SELECT COUNT(*)\n   FROM Latest\n   WHERE rn = 1\n     AND 现有库存 > 0\n     AND 有效期至 IS NOT NULL AND 有效期至 <> ''\n     AND 有效期至 < '2027-06-30'\n  ) AS LatestCount",
+      "reason": "需要按仓库、商品、批号组合统计当前有库存且有效期早于2027-06-30的批次数，并验证两种当前库存口径。",
+      "message": "",
+      "rowCount": null,
+      "error": "Only SELECT queries are allowed.",
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 3,
+     "llmErrors": 0,
+     "promptTokens": 2927,
+     "completionTokens": 3644,
+     "cachedPromptTokens": 1536
+    },
+    "latencyMs": 15504,
+    "error": "Analysis failed: Only SELECT queries are allowed."
+   }
+  },
+  {
+   "id": "X22",
+   "category": "inventory",
+   "question": "医疗器械类商品当前在三个仓库的库存总量是多少？",
+   "ok": false,
+   "reason": "ANSWER_ONLY:结果不一致：gold 1 行，Agent 3 行",
+   "trace": {
+    "answer": "医疗器械类商品在当前三个仓库的库存总量为 187，分仓库明细如下：\n- 长沙中心仓：173\n- 湘潭前置仓：6\n- 株洲前置仓：8\n\n合计：173 + 6 + 8 = 187。",
+    "finalSql": "SELECT 仓库名称, SUM(CASE WHEN ISNUMERIC(现有库存) = 1 THEN CAST(现有库存 AS DECIMAL(18,2)) ELSE 0 END) AS 库存总量 FROM dbo.inout WHERE 商品类别 LIKE '%医疗器械%' GROUP BY 仓库名称 ORDER BY 仓库名称",
+    "rowCount": 3,
+    "rows": [
+     {
+      "仓库名称": "长沙中心仓",
+      "库存总量": 173.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "库存总量": 6.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "库存总量": 8.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, SUM(CASE WHEN ISNUMERIC(现有库存) = 1 THEN CAST(现有库存 AS DECIMAL(18,2)) ELSE 0 END) AS 库存总量 FROM dbo.inout WHERE 商品类别 LIKE '%医疗器械%' GROUP BY 仓库名称 ORDER BY 仓库名称",
+      "reason": "需要按仓库统计医疗器械类商品的当前库存总量。",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 15
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已获得三个仓库的库存明细，汇总即可得出总量。",
+      "message": "医疗器械类商品在当前三个仓库的库存总量为 187，分仓库明细如下：\n- 长沙中心仓：173\n- 湘潭前置仓：6\n- 株洲前置仓：8\n\n合计：173 + 6 + 8 = 187。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1712,
+     "completionTokens": 1351,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 6546,
+    "error": null
+   }
+  },
+  {
+   "id": "X23",
+   "category": "inventory",
+   "question": "哪些仓库的哪些商品当前库存在 10 到 20 之间（含 10 和 20）？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "按“当前库存”（每个仓库+商品取最新一条记录的现有库存）统计，库存数量在 10 到 20 之间（含两端）的仓库与商品共 17 条，明细如下：\n\n【长沙中心仓】1 条\n- YP4005 红外体温计（额温型）：库存 15\n\n【湘潭前置仓】7 条\n- YP1003 头孢克肟分散片（0.1g*6片）：库存 14\n- YP1008 阿托伐他汀钙片（20mg*7片）：库存 14\n- YP1011 硝苯地平控释片（30mg*7片）：库存 11\n- YP1012 左氧氟沙星片（0.5g*4片）：库存 11\n- YP2003 复方丹参滴丸（27mg*180丸）：库存 11\n- YP2004 藿香正气水（10ml*10支）：库存 14\n- YP3003 枸杞子（500g）：库存 11\n\n【株洲前置仓】9 条\n- YP1003 头孢克肟分散片（0.1g*6片）：库存 14\n- YP1006 奥美拉唑肠溶胶囊（20mg*14粒）：库存 18\n- YP1008 阿托伐他汀钙片（20mg*7片）：库存 14\n- YP1009 蒙脱石散（3g*10袋）：库存 11\n- YP1012 左氧氟沙星片（0.5g*4片）：库存 11\n- YP2003 复方丹参滴丸（27mg*180丸）：库存 11\n- YP2004 藿香正气水（10ml*10支）：库存 16\n- YP3003 枸杞子（500g）：库存 11\n- YP5005 医用纱布块（10片/包）：库存 18\n\n汇总：长沙中心仓 1 种、湘潭前置仓 7 种、株洲前置仓 9 种；湘潭与株洲前置仓对常见中西成药的低库存重合度较高（如 YP1003、YP1008、YP1012、YP2003、YP2004、YP3003 均同时偏低）。",
+    "finalSql": "WITH ranked AS (\n  SELECT 仓库名称, 商品编号, 商品名称, 商品规格, 现有库存, 按日期, id,\n         ROW_NUMBER() OVER (PARTITION BY 仓库名称, 商品编号, 商品规格 ORDER BY 按日期 DESC, id DESC) AS rn\n  FROM dbo.inout\n  WHERE 现有库存 IS NOT NULL\n)\nSELECT 仓库名称, 商品编号, 商品名称, 商品规格, 现有库存\nFROM ranked\nWHERE rn = 1\n  AND 现有库存 BETWEEN 10 AND 20\nORDER BY 仓库名称, 商品编号",
+    "rowCount": 17,
+    "rows": [
+     {
+      "仓库名称": "长沙中心仓",
+      "商品编号": "YP4005",
+      "商品名称": "红外体温计",
+      "商品规格": "额温型",
+      "现有库存": 15.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP1003",
+      "商品名称": "头孢克肟分散片",
+      "商品规格": "0.1g*6片",
+      "现有库存": 14.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP1008",
+      "商品名称": "阿托伐他汀钙片",
+      "商品规格": "20mg*7片",
+      "现有库存": 14.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP1011",
+      "商品名称": "硝苯地平控释片",
+      "商品规格": "30mg*7片",
+      "现有库存": 11.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP1012",
+      "商品名称": "左氧氟沙星片",
+      "商品规格": "0.5g*4片",
+      "现有库存": 11.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP2003",
+      "商品名称": "复方丹参滴丸",
+      "商品规格": "27mg*180丸",
+      "现有库存": 11.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP2004",
+      "商品名称": "藿香正气水",
+      "商品规格": "10ml*10支",
+      "现有库存": 14.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP3003",
+      "商品名称": "枸杞子",
+      "商品规格": "500g",
+      "现有库存": 11.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP1003",
+      "商品名称": "头孢克肟分散片",
+      "商品规格": "0.1g*6片",
+      "现有库存": 14.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP1006",
+      "商品名称": "奥美拉唑肠溶胶囊",
+      "商品规格": "20mg*14粒",
+      "现有库存": 18.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP1008",
+      "商品名称": "阿托伐他汀钙片",
+      "商品规格": "20mg*7片",
+      "现有库存": 14.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP1009",
+      "商品名称": "蒙脱石散",
+      "商品规格": "3g*10袋",
+      "现有库存": 11.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP1012",
+      "商品名称": "左氧氟沙星片",
+      "商品规格": "0.5g*4片",
+      "现有库存": 11.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP2003",
+      "商品名称": "复方丹参滴丸",
+      "商品规格": "27mg*180丸",
+      "现有库存": 11.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP2004",
+      "商品名称": "藿香正气水",
+      "商品规格": "10ml*10支",
+      "现有库存": 16.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP3003",
+      "商品名称": "枸杞子",
+      "商品规格": "500g",
+      "现有库存": 11.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP5005",
+      "商品名称": "医用纱布块",
+      "商品规格": "10片/包",
+      "现有库存": 18.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "WITH ranked AS (\n  SELECT 仓库名称, 商品编号, 商品名称, 商品规格, 现有库存, 按日期, id,\n         ROW_NUMBER() OVER (PARTITION BY 仓库名称, 商品编号, 商品规格 ORDER BY 按日期 DESC, id DESC) AS rn\n  FROM dbo.inout\n  WHERE 现有库存 IS NOT NULL\n)\nSELECT 仓库名称, 商品编号, 商品名称, 商品规格, 现有库存\nFROM ranked\nWHERE rn = 1\n  AND 现有库存 BETWEEN 10 AND 20\nORDER BY 仓库名称, 商品编号",
+      "reason": "需要查询当前库存，按仓库+商品取最新记录后筛选 10 到 20（含）之间的库存。",
+      "message": "",
+      "rowCount": 17,
+      "error": null,
+      "durationMs": 29
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已按仓库+商品取最新库存记录并筛选 10~20 区间，返回完整明细供最终答复。",
+      "message": "按“当前库存”（每个仓库+商品取最新一条记录的现有库存）统计，库存数量在 10 到 20 之间（含两端）的仓库与商品共 17 条，明细如下：\n\n【长沙中心仓】1 条\n- YP4005 红外体温计（额温型）：库存 15\n\n【湘潭前置仓】7 条\n- YP1003 头孢克肟分散片（0.1g*6片）：库存 14\n- YP1008 阿托伐他汀钙片（20mg*7片）：库存 14\n- YP1011 硝苯地平控释片（30mg*7片）：库存 11\n- YP1012 左氧氟沙星片（0.5g*4片）：库存 11\n- YP2003 复方丹参滴丸（27mg*180丸）：库存 11\n- YP2004 藿香正气水（10ml*10支）：库存 14\n- YP3003 枸杞子（500g）：库存 11\n\n【株洲前置仓】9 条\n- YP1003 头孢克肟分散片（0.1g*6片）：库存 14\n- YP1006 奥美拉唑肠溶胶囊（20mg*14粒）：库存 18\n- YP1008 阿托伐他汀钙片（20mg*7片）：库存 14\n- YP1009 蒙脱石散（3g*10袋）：库存 11\n- YP1012 左氧氟沙星片（0.5g*4片）：库存 11\n- YP2003 复方丹参滴丸（27mg*180丸）：库存 11\n- YP2004 藿香正气水（10ml*10支）：库存 16\n- YP3003 枸杞子（500g）：库存 11\n- YP5005 医用纱布块（10片/包）：库存 18\n\n汇总：长沙中心仓 1 种、湘潭前置仓 7 种、株洲前置仓 9 种；湘潭与株洲前置仓对常见中西成药的低库存重合度较高（如 YP1003、YP1008、YP1012、YP2003、YP2004、YP3003 均同时偏低）。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 2457,
+     "completionTokens": 1872,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 7801,
+    "error": null
+   }
+  },
+  {
+   "id": "X24",
+   "category": "complex",
+   "question": "今年采购入库金额最多的供应商，它的商品今年销售出库金额是多少？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "今年采购入库金额最多的供应商是「百草堂中药饮片有限公司」，其今年采购入库金额为 165,377.40 元。该供应商对应的今年销售出库金额为 218,671.40 元。",
+    "finalSql": "SELECT SUM(CAST(REPLACE(CAST(开单金额 AS VARCHAR(50)), ',', '') AS DECIMAL(18,2))) AS 销售出库金额 FROM dbo.inout WHERE YEAR(按日期) = YEAR(GETDATE()) AND 供应商名称 = ? AND 单据类型 LIKE '%销售%' AND 单据类型 LIKE '%出库%' /* params=[百草堂中药饮片有限公司] */",
+    "rowCount": 1,
+    "rows": [
+     {
+      "销售出库金额": 218671.4
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT TOP 1 供应商名称, SUM(CAST(REPLACE(CAST(开单金额 AS VARCHAR(50)), ',', '') AS DECIMAL(18,2))) AS 采购入库金额 FROM dbo.inout WHERE YEAR(按日期) = YEAR(GETDATE()) AND 单据类型 LIKE '%采购%' AND 单据类型 LIKE '%入库%' AND 供应商名称 IS NOT NULL GROUP BY 供应商名称 ORDER BY 采购入库金额 DESC",
+      "reason": "需要先确定今年采购入库金额最多的供应商，作为下一步计算销售出库金额的条件。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 38
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT SUM(CAST(REPLACE(CAST(开单金额 AS VARCHAR(50)), ',', '') AS DECIMAL(18,2))) AS 销售出库金额 FROM dbo.inout WHERE YEAR(按日期) = YEAR(GETDATE()) AND 供应商名称 = ? AND 单据类型 LIKE '%销售%' AND 单据类型 LIKE '%出库%' /* params=[百草堂中药饮片有限公司] */",
+      "reason": "需要计算已确定的采购入库金额最多供应商在今年销售出库单据中的开单金额合计。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 31
+     },
+     {
+      "step": 3,
+      "action": "final",
+      "sql": "",
+      "reason": "已完成两步查询：先确定今年采购入库金额最高的供应商，再统计其今年销售出库金额。",
+      "message": "今年采购入库金额最多的供应商是「百草堂中药饮片有限公司」，其今年采购入库金额为 165,377.40 元。该供应商对应的今年销售出库金额为 218,671.40 元。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 3,
+     "llmErrors": 0,
+     "promptTokens": 2821,
+     "completionTokens": 3043,
+     "cachedPromptTokens": 1536
+    },
+    "latencyMs": 14495,
+    "error": null
+   }
+  },
+  {
+   "id": "X25",
+   "category": "complex",
+   "question": "哪些商品今年的销售退货金额超过 300 元？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "今年销售退货金额超过 300 元的商品共有 12 个，按金额从高到低如下：\n\n1. YP4004 医用雾化器 — 897.00 元\n2. YP2002 连花清瘟胶囊 — 831.60 元\n3. YP6003 蛋白粉 — 632.00 元\n4. YP4003 血糖试纸 — 620.00 元\n5. YP1003 头孢克肟分散片 — 570.00 元\n6. YP4001 电子血压计 — 567.00 元\n7. YP6002 钙维生素D片 — 544.00 元\n8. YP3003 枸杞子 — 520.00 元\n9. YP5001 医用外科口罩 — 390.00 元\n10. YP3005 党参段 — 348.00 元\n11. YP2001 板蓝根颗粒 — 310.50 元\n12. YP2006 感冒灵颗粒 — 308.00 元\n\n统计口径：单据类型包含“销售退货”，按日期为今年（1 月 1 日至 12 月 31 日），对开单金额求和后筛选大于 300 元的商品。",
+    "finalSql": "SELECT 商品编号, 商品名称, SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 销售退货金额 FROM dbo.inout WHERE 单据类型 LIKE '%销售退货%' AND 按日期 >= DATEADD(YEAR, DATEDIFF(YEAR, 0, GETDATE()), 0) AND 按日期 < DATEADD(YEAR, DATEDIFF(YEAR, 0, GETDATE()) + 1, 0) GROUP BY 商品编号, 商品名称 HAVING SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) > 300 ORDER BY 销售退货金额 DESC",
+    "rowCount": 12,
+    "rows": [
+     {
+      "商品编号": "YP4004",
+      "商品名称": "医用雾化器",
+      "销售退货金额": 897.0
+     },
+     {
+      "商品编号": "YP2002",
+      "商品名称": "连花清瘟胶囊",
+      "销售退货金额": 831.6
+     },
+     {
+      "商品编号": "YP6003",
+      "商品名称": "蛋白粉",
+      "销售退货金额": 632.0
+     },
+     {
+      "商品编号": "YP4003",
+      "商品名称": "血糖试纸",
+      "销售退货金额": 620.0
+     },
+     {
+      "商品编号": "YP1003",
+      "商品名称": "头孢克肟分散片",
+      "销售退货金额": 570.0
+     },
+     {
+      "商品编号": "YP4001",
+      "商品名称": "电子血压计",
+      "销售退货金额": 567.0
+     },
+     {
+      "商品编号": "YP6002",
+      "商品名称": "钙维生素D片",
+      "销售退货金额": 544.0
+     },
+     {
+      "商品编号": "YP3003",
+      "商品名称": "枸杞子",
+      "销售退货金额": 520.0
+     },
+     {
+      "商品编号": "YP5001",
+      "商品名称": "医用外科口罩",
+      "销售退货金额": 390.0
+     },
+     {
+      "商品编号": "YP3005",
+      "商品名称": "党参段",
+      "销售退货金额": 348.0
+     },
+     {
+      "商品编号": "YP2001",
+      "商品名称": "板蓝根颗粒",
+      "销售退货金额": 310.5
+     },
+     {
+      "商品编号": "YP2006",
+      "商品名称": "感冒灵颗粒",
+      "销售退货金额": 308.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT 商品编号, 商品名称, SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 销售退货金额 FROM dbo.inout WHERE 单据类型 LIKE '%销售退货%' AND 按日期 >= DATEADD(YEAR, DATEDIFF(YEAR, 0, GETDATE()), 0) AND 按日期 < DATEADD(YEAR, DATEDIFF(YEAR, 0, GETDATE()) + 1, 0) GROUP BY 商品编号, 商品名称 HAVING SUM(CASE WHEN ISNUMERIC(开单金额) = 1 THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) > 300 ORDER BY 销售退货金额 DESC",
+      "reason": "按商品汇总今年单据类型为销售退货的开单金额，并筛选超过 300 元的商品。",
+      "message": "",
+      "rowCount": 12,
+      "error": null,
+      "durationMs": 23
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已获取今年销售退货金额超 300 元的商品明细，可直接给出结论。",
+      "message": "今年销售退货金额超过 300 元的商品共有 12 个，按金额从高到低如下：\n\n1. YP4004 医用雾化器 — 897.00 元\n2. YP2002 连花清瘟胶囊 — 831.60 元\n3. YP6003 蛋白粉 — 632.00 元\n4. YP4003 血糖试纸 — 620.00 元\n5. YP1003 头孢克肟分散片 — 570.00 元\n6. YP4001 电子血压计 — 567.00 元\n7. YP6002 钙维生素D片 — 544.00 元\n8. YP3003 枸杞子 — 520.00 元\n9. YP5001 医用外科口罩 — 390.00 元\n10. YP3005 党参段 — 348.00 元\n11. YP2001 板蓝根颗粒 — 310.50 元\n12. YP2006 感冒灵颗粒 — 308.00 元\n\n统计口径：单据类型包含“销售退货”，按日期为今年（1 月 1 日至 12 月 31 日），对开单金额求和后筛选大于 300 元的商品。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 2061,
+     "completionTokens": 1373,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 6404,
+    "error": null
+   }
+  },
+  {
+   "id": "X26",
+   "category": "complex",
+   "question": "今年每个仓库的销售出库金额各占全部销售出库金额的百分之多少？（用百分数数值表示，例如 12.34）",
+   "ok": false,
+   "reason": "运行出错: Analysis failed: Incorrect syntax near 'ົ'.",
+   "trace": {
+    "answer": "",
+    "finalSql": "",
+    "rowCount": 0,
+    "rows": [],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "WITH SalesByWarehouse AS (\n    SELECT 仓库名称,\n           SUM(CASE WHEN 开单金额 IS NOT NULL THEN CAST(开单金额 AS DECIMAL(18,2)) ELSE 0 END) AS 销售出库金额\n    FROM dbo.inout\n    WHERE 单据类型 LIKE '%销售%'\n      AND YEAR(按日期) = YEAR(GETDATE())\n    GROUP BY 仓库名称\n), Total AS (\n    SELECT SUM(销售出库金额) AS 总销售出库金额\n    FROM SalesByWarehouse\n)\nSELECT 仓库名称,\n       ົ销售出库金额 AS 销售出库金额,\n       CAST(100.0 * 销售出库金额 / NULLIF(总销售出库金额, 0) AS DECIMAL(18,2)) AS 占比百分比\nFROM SalesByWarehouse\nCROSS JOIN Total\nORDER BY 占比百分比 DESC",
+      "reason": "按仓库汇总今年销售类单据的开单金额，并计算其占全部销售出库金额的百分比。",
+      "message": "",
+      "rowCount": null,
+      "error": "Incorrect syntax near 'ົ'.",
+      "durationMs": 22
+     }
+    ],
+    "usage": {
+     "llmCalls": 1,
+     "llmErrors": 0,
+     "promptTokens": 807,
+     "completionTokens": 1346,
+     "cachedPromptTokens": 512
+    },
+    "latencyMs": 5926,
+    "error": "Analysis failed: Incorrect syntax near 'ົ'."
+   }
+  },
+  {
+   "id": "X27",
+   "category": "complex",
+   "question": "有多少个客户在 2026 年 9 月份没有任何销售出库？",
+   "ok": false,
+   "reason": "ANSWER_ONLY:结果不一致：gold 1 行，Agent 1 行",
+   "trace": {
+    "answer": "在 2026 年 9 月份没有任何销售出库的客户共有 0 个。\n\n依据：数据库中客户名称非空的客户共 8 个，其中 8 个在 2026-09-01 至 2026-09-30 期间均有销售出库记录（单据类型含\"销售\"且出库数量>0），因此没有销售出库的客户数为 0。",
+    "finalSql": "SELECT COUNT(DISTINCT 客户名称) AS 全部客户数, COUNT(DISTINCT CASE WHEN 单据类型 LIKE '%销售%' AND 按日期 >= '2026-09-01' AND 按日期 < '2026-10-01' AND 出库数量 > 0 THEN 客户名称 END) AS 九月有销售出库客户数 FROM dbo.inout WHERE 客户名称 IS NOT NULL AND LTRIM(RTRIM(客户名称)) <> ''",
+    "rowCount": 1,
+    "rows": [
+     {
+      "全部客户数": 8,
+      "九月有销售出库客户数": 8
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT COUNT(DISTINCT t.客户名称) AS 客户数 FROM dbo.inout t WHERE t.客户名称 IS NOT NULL AND NOT EXISTS ( SELECT 1 FROM dbo.inout s WHERE s.客户名称 = t.客户名称 AND s.单据类型 LIKE '%销售%' AND s.按日期 >= '2026-09-01' AND s.按日期 < '2026-10-01' AND s.出库数量 > 0 )",
+      "reason": "统计无销售出库的客户数",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 43
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT COUNT(*) AS 总行数, MIN(按日期) AS 最早日期, MAX(按日期) AS 最晚日期, SUM(CASE WHEN 客户名称 IS NOT NULL AND LTRIM(RTRIM(客户名称)) <> '' THEN 1 ELSE 0 END) AS 有客户名称行数 FROM dbo.inout",
+      "reason": "校验数据范围与客户字段是否为空",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 20
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT COUNT(DISTINCT 客户名称) AS 全部客户数, COUNT(DISTINCT CASE WHEN 单据类型 LIKE '%销售%' AND 按日期 >= '2026-09-01' AND 按日期 < '2026-10-01' AND 出库数量 > 0 THEN 客户名称 END) AS 九月有销售出库客户数 FROM dbo.inout WHERE 客户名称 IS NOT NULL AND LTRIM(RTRIM(客户名称)) <> ''",
+      "reason": "确认总数与九月有销售出库的客户数，推断无销售出库客户数",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 43
+     },
+     {
+      "step": 4,
+      "action": "final",
+      "sql": "",
+      "reason": "已通过两次校验查询确认：全部客户8个，九月有销售出库客户8个，故无销售出库客户为0",
+      "message": "在 2026 年 9 月份没有任何销售出库的客户共有 0 个。\n\n依据：数据库中客户名称非空的客户共 8 个，其中 8 个在 2026-09-01 至 2026-09-30 期间均有销售出库记录（单据类型含\"销售\"且出库数量>0），因此没有销售出库的客户数为 0。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 4,
+     "llmErrors": 0,
+     "promptTokens": 3996,
+     "completionTokens": 3462,
+     "cachedPromptTokens": 2048
+    },
+    "latencyMs": 15362,
+    "error": null
+   }
+  },
+  {
+   "id": "X28",
+   "category": "complex",
+   "question": "包含 6 种及以上不同商品的销售出库单有多少张？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "包含 6 种及以上不同商品的销售出库单共有 161 张。\n\n统计口径：按“单据编号”分组，筛选单据类型同时包含“销售”和“出库”的记录，统计每组中不同“商品编号”的数量，取不少于 6 种的单据进行计数。",
+    "finalSql": "SELECT COUNT(*) AS 单据数 FROM (SELECT 单据编号 FROM dbo.inout WHERE 单据类型 LIKE '%销售%' AND 单据类型 LIKE '%出库%' GROUP BY 单据编号 HAVING COUNT(DISTINCT 商品编号) >= 6) t",
+    "rowCount": 1,
+    "rows": [
+     {
+      "单据数": 161
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT COUNT(*) AS 单据数 FROM (SELECT 单据编号 FROM dbo.inout WHERE 单据类型 LIKE '%销售%' AND 单据类型 LIKE '%出库%' GROUP BY 单据编号 HAVING COUNT(DISTINCT 商品编号) >= 6) t",
+      "reason": "按单据编号分组统计不同商品数，筛选销售出库类型且商品数不少于6的销售出库单张数。",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 43
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已通过分组统计得到结果，可直接回答。",
+      "message": "包含 6 种及以上不同商品的销售出库单共有 161 张。\n\n统计口径：按“单据编号”分组，筛选单据类型同时包含“销售”和“出库”的记录，统计每组中不同“商品编号”的数量，取不少于 6 种的单据进行计数。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1689,
+     "completionTokens": 732,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 4359,
+    "error": null
+   }
+  },
+  {
+   "id": "X29",
+   "category": "multi_turn",
+   "question": "它今年一共有多少行采购入库明细？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "截至今年，百草堂中药饮片有限公司的采购入库明细共有 60 行。",
+    "finalSql": "SELECT COUNT(*) AS 明细行数 FROM dbo.inout WHERE 供应商名称 = ? AND 单据类型 LIKE ? AND YEAR(按日期) = YEAR(GETDATE()) /* params=[百草堂中药饮片有限公司, %采购入库%] */",
+    "rowCount": 1,
+    "rows": [
+     {
+      "明细行数": 60
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT COUNT(*) AS 明细行数 FROM dbo.inout WHERE 供应商名称 = ? AND 单据类型 LIKE ? AND YEAR(按日期) = YEAR(GETDATE()) /* params=[百草堂中药饮片有限公司, %采购入库%] */",
+      "reason": "统计指定供应商今年采购入库明细行数",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 30
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已有统计结果显示该供应商今年采购入库明细行数为 60",
+      "message": "截至今年，百草堂中药饮片有限公司的采购入库明细共有 60 行。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1714,
+     "completionTokens": 360,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 2452,
+    "error": null
+   }
+  },
+  {
+   "id": "X30",
+   "category": "multi_turn",
+   "question": "长沙中心仓呢？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "长沙中心仓当前库存最多的 3 个商品：医用棉签，368；阿莫西林胶囊，338；苯磺酸氨氯地平片，307。",
+    "finalSql": "SELECT TOP 3 商品名称 AS 商品名称, SUM(CASE WHEN ISNUMERIC(现有库存) = 1 THEN CAST(现有库存 AS decimal(18,2)) ELSE 0 END) AS 当前库存 FROM dbo.inout WHERE 仓库名称 = ? GROUP BY 商品名称 ORDER BY 当前库存 DESC /* params=[长沙中心仓] */",
+    "rowCount": 3,
+    "rows": [
+     {
+      "商品名称": "医用棉签",
+      "当前库存": 368.0
+     },
+     {
+      "商品名称": "阿莫西林胶囊",
+      "当前库存": 338.0
+     },
+     {
+      "商品名称": "苯磺酸氨氯地平片",
+      "当前库存": 307.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "run_sql",
+      "sql": "SELECT TOP 3 商品名称 AS 商品名称, SUM(CASE WHEN ISNUMERIC(现有库存) = 1 THEN CAST(现有库存 AS decimal(18,2)) ELSE 0 END) AS 当前库存 FROM dbo.inout WHERE 仓库名称 = ? GROUP BY 商品名称 ORDER BY 当前库存 DESC /* params=[长沙中心仓] */",
+      "reason": "用户想知道长沙中心仓的库存最多商品，按现有库存汇总前3名。",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 10
+     },
+     {
+      "step": 2,
+      "action": "final",
+      "sql": "",
+      "reason": "已根据工具查询结果得出长沙中心仓库存前3名商品。",
+      "message": "长沙中心仓当前库存最多的 3 个商品：医用棉签，368；阿莫西林胶囊，338；苯磺酸氨氯地平片，307。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 2,
+     "llmErrors": 0,
+     "promptTokens": 1827,
+     "completionTokens": 625,
+     "cachedPromptTokens": 1024
+    },
+    "latencyMs": 3382,
+    "error": null
+   }
+  }
+ ]
+}

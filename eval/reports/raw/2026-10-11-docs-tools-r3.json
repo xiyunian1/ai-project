@@ -1,0 +1,973 @@
+{
+ "meta": {
+  "label": "docs-tools-r3",
+  "startedAt": "2026-10-11T00:41:43",
+  "model": "deepseek-flash",
+  "casesFile": "sql_cases_docs.jsonl",
+  "concurrency": 3,
+  "agentMode": "tools"
+ },
+ "results": [
+  {
+   "id": "R01",
+   "category": "docs_and_data",
+   "question": "按照公司的效期管理制度，以 2026 年 9 月 30 日为基准，目前还有库存的近效期批次有哪些？列出仓库、商品和批号。",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "## 结论\n\n以 2026-09-30 为基准，按《效期管理制度》2.1「距有效期截止日不足 6 个月（含 6 个月）即近效期」（即有效期 ≤ 2027-03-31），目前仍有库存的近效期批次共 **6 个**：\n\n| 仓库 | 商品编号 | 商品名称 | 批号 | 有效期至 | 结存数量 |\n|---|---|---|---|---|---|\n| 长沙中心仓 | YP6001 | 维生素D3软胶囊 | 250621J | 2026-12-20 | 36 |\n| 湘潭前置仓 | YP6001 | 维生素D3软胶囊 | 250621J | 2026-12-20 | 4 |\n| 株洲前置仓 | YP6001 | 维生素D3软胶囊 | 250621J | 2026-12-20 | 7 |\n| 长沙中心仓 | YP5004 | 碘伏消毒液 | 250717J | 2027-01-15 | 39 |\n| 株洲前置仓 | YP5004 | 碘伏消毒液 | 250717J | 2027-01-15 | 22 |\n| 湘潭前置仓 | YP6003 | 蛋白粉 | 260313A | 2027-03-12 | 4 |\n\n- 涉及 3 个商品：维生素D3软胶囊（47）、碘伏消毒液（61）、蛋白粉（4），合计 **112 个单位**；其中蛋白粉效期最近期，2027-03-12。\n- 判定依据：《效期管理制度》第二章 2.1（近效期定义）、2.2（上月末近效期报表需列明仓库、品名、批号、有效期、库存数量）。\n\n## 说明\n\n1. **口径**：结存数量 = 该仓库+商品+批号的全部流水「入库数量−出库数量」，代表 2026-09-30 导出时点该批次的剩余库存。已核对：按批号汇总的结存合计与「现有库存」列（仅填在仓库+商品最后一行）在全部 114 个仓库-商品组合上 100% 吻合，因此该口径可靠（如长沙中心仓维生素D3软胶囊现有库存 84 = 250621J 批次 36 + 另一批次 250821B 48）。\n2. **已剔除失效批次**：当归片 250814A（2026-08-13）、枸杞子 250819A、金银花 250916C、黄芪片 251002B（2026-10-01）等更早效期的批次，截至基准日流水结存为 0（已全部出库/调拨），故不在清单内。\n3. 边界核对：下一个待进入近效期的批次为湘潭前置仓黄芪片 260405A（2027-04-04），超出 6 个月窗口，本次不计入。",
+    "finalSql": "SELECT 仓库名称, 商品编号, 商品名称, 批号, 有效期至, SUM(入库数量)-SUM(出库数量) AS 结存数量\nFROM dbo.inout\nGROUP BY 仓库名称, 商品编号, 商品名称, 批号, 有效期至\nHAVING SUM(入库数量)-SUM(出库数量) > 0\n   AND CAST(有效期至 AS DATE) <= DATEADD(month, 6, CAST('2026-09-30' AS DATE))\nORDER BY 有效期至, 仓库名称",
+    "rowCount": 6,
+    "rows": [
+     {
+      "仓库名称": "长沙中心仓",
+      "商品编号": "YP6001",
+      "商品名称": "维生素D3软胶囊",
+      "批号": "250621J",
+      "有效期至": "2026-12-20",
+      "结存数量": 36.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP6001",
+      "商品名称": "维生素D3软胶囊",
+      "批号": "250621J",
+      "有效期至": "2026-12-20",
+      "结存数量": 4.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP6001",
+      "商品名称": "维生素D3软胶囊",
+      "批号": "250621J",
+      "有效期至": "2026-12-20",
+      "结存数量": 7.0
+     },
+     {
+      "仓库名称": "长沙中心仓",
+      "商品编号": "YP5004",
+      "商品名称": "碘伏消毒液",
+      "批号": "250717J",
+      "有效期至": "2027-01-15",
+      "结存数量": 39.0
+     },
+     {
+      "仓库名称": "株洲前置仓",
+      "商品编号": "YP5004",
+      "商品名称": "碘伏消毒液",
+      "批号": "250717J",
+      "有效期至": "2027-01-15",
+      "结存数量": 22.0
+     },
+     {
+      "仓库名称": "湘潭前置仓",
+      "商品编号": "YP6003",
+      "商品名称": "蛋白粉",
+      "批号": "260313A",
+      "有效期至": "2027-03-12",
+      "结存数量": 4.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "近效期商品定义 效期预警",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 607
+     },
+     {
+      "step": 1,
+      "action": "describe_table",
+      "sql": "",
+      "reason": "dbo.inout",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT TOP 30 仓库名称, 商品编号, 商品名称, 批号, 有效期至, COUNT(*) AS 行数, SUM(入库数量) AS 入库合计, SUM(出库数量) AS 出库合计, MAX(CAST(按日期 AS DATE)) AS 最后日期 FROM dbo.inout WHERE 有效期至 <= '2027-03-31' GROUP BY 仓库名称, 商品编号, 商品名称, 批号, 有效期至 ORDER BY 有效期至",
+      "reason": "探索近效期批次的分布与结存情况",
+      "message": "",
+      "rowCount": 30,
+      "error": null,
+      "durationMs": 28
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT 商品类别, MIN(有效期至) AS 最早效期, MAX(有效期至) AS 最晚效期 FROM dbo.inout GROUP BY 商品类别",
+      "reason": "了解效期范围",
+      "message": "",
+      "rowCount": 6,
+      "error": null,
+      "durationMs": 9
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT TOP 40 id, 按日期, 单据类型, 单据编号, 仓库名称, 商品编号, 批号, 有效期至, 入库数量, 出库数量, 库存数量, 现有库存 FROM dbo.inout WHERE 仓库名称=N'长沙中心仓' AND 商品编号=N'YP3002' ORDER BY CAST(按日期 AS DATE), id",
+      "reason": "查看单个仓库商品的流水，理解库存数量口径",
+      "message": "",
+      "rowCount": 40,
+      "error": null,
+      "durationMs": 26
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, 商品编号, 商品名称, 批号, MIN(有效期至) AS 有效期至, SUM(入库数量) AS 入库, SUM(出库数量) AS 出库, MAX(CAST(按日期 AS DATE)) AS 最后日期, MAX(现有库存) AS 现有库存 FROM dbo.inout WHERE 有效期至 <= '2027-03-31' GROUP BY 仓库名称, 商品编号, 商品名称, 批号 HAVING SUM(入库数量)-SUM(出库数量) > 0 ORDER BY 有效期至",
+      "reason": "查看有效期为近效期且入库大于出库的批次",
+      "message": "",
+      "rowCount": 6,
+      "error": null,
+      "durationMs": 15
+     },
+     {
+      "step": 4,
+      "action": "run_sql",
+      "sql": "SELECT id, 按日期, 单据类型, 批号, 有效期至, 入库数量, 出库数量, 库存数量, 现有库存 FROM dbo.inout WHERE 仓库名称=N'长沙中心仓' AND 商品编号=N'YP6001' ORDER BY CAST(按日期 AS DATE), id",
+      "reason": "查看长沙中心仓YP6001全部流水，判断批次与库存关系",
+      "message": "",
+      "rowCount": 103,
+      "error": null,
+      "durationMs": 32
+     },
+     {
+      "step": 4,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, 商品编号, COUNT(DISTINCT 批号) AS 批次数, STRING_AGG(批号, ',') AS 批号列表 FROM dbo.inout GROUP BY 仓库名称, 商品编号 HAVING COUNT(DISTINCT 批号) >= 1 ORDER BY 批次数 DESC",
+      "reason": "查看各仓库商品是否只有一个批次",
+      "message": "",
+      "rowCount": 114,
+      "error": null,
+      "durationMs": 47
+     },
+     {
+      "step": 5,
+      "action": "run_sql",
+      "sql": "WITH b AS (\n  SELECT 仓库名称, 商品编号, 批号, SUM(入库数量)-SUM(出库数量) AS 批次结存\n  FROM dbo.inout GROUP BY 仓库名称, 商品编号, 批号\n), p AS (\n  SELECT 仓库名称, 商品编号, MAX(现有库存) AS 现有库存, SUM(批次结存) AS 批次结存合计\n  FROM b GROUP BY 仓库名称, 商品编号\n)\nSELECT COUNT(*) AS 组合数, SUM(CASE WHEN 现有库存 = 批次结存合计 THEN 1 ELSE 0 END) AS 吻合数\nFROM p WHERE 现有库存 IS NOT NULL",
+      "reason": "核对按批号计算的结存合计是否等于该仓库商品的现有库存",
+      "message": "",
+      "rowCount": null,
+      "error": "Invalid column name '现有库存'.",
+      "durationMs": 19
+     },
+     {
+      "step": 5,
+      "action": "run_sql",
+      "sql": "SELECT 批号, COUNT(DISTINCT 有效期至) AS 效期数 FROM dbo.inout GROUP BY 批号 HAVING COUNT(DISTINCT 有效期至) > 1",
+      "reason": "检查同一批号是否对应唯一有效期",
+      "message": "",
+      "rowCount": 19,
+      "error": null,
+      "durationMs": 20
+     },
+     {
+      "step": 6,
+      "action": "run_sql",
+      "sql": "WITH b AS (\n  SELECT 仓库名称, 商品编号, 批号, SUM(入库数量)-SUM(出库数量) AS 批次结存\n  FROM dbo.inout GROUP BY 仓库名称, 商品编号, 批号\n), p AS (\n  SELECT 仓库名称, 商品编号, SUM(批次结存) AS 批次结存合计\n  FROM b GROUP BY 仓库名称, 商品编号\n), s AS (\n  SELECT 仓库名称, 商品编号, MAX(现有库存) AS 现有库存 FROM dbo.inout GROUP BY 仓库名称, 商品编号\n)\nSELECT COUNT(*) AS 组合数, SUM(CASE WHEN s.现有库存 = p.批次结存合计 THEN 1 ELSE 0 END) AS 吻合数\nFROM p JOIN s ON p.仓库名称=s.仓库名称 AND p.商品编号=s.商品编号\nWHERE s.现有库存 IS NOT NULL",
+      "reason": "核对批次结存合计与现有库存是否一致",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 66
+     },
+     {
+      "step": 7,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, 商品名称, 批号, 有效期至, SUM(入库数量)-SUM(出库数量) AS 批次结存\nFROM dbo.inout\nGROUP BY 仓库名称, 商品编号, 商品名称, 批号, 有效期至\nHAVING SUM(入库数量)-SUM(出库数量) > 0 AND 有效期至 BETWEEN '2027-03-01' AND '2027-04-30'\nORDER BY 有效期至",
+      "reason": "查看2027年3月-4月到期且有结存的批次，确认阈值边界",
+      "message": "",
+      "rowCount": 5,
+      "error": null,
+      "durationMs": 35
+     },
+     {
+      "step": 8,
+      "action": "run_sql",
+      "sql": "SELECT 仓库名称, 商品编号, 商品名称, 批号, 有效期至, SUM(入库数量)-SUM(出库数量) AS 结存数量\nFROM dbo.inout\nGROUP BY 仓库名称, 商品编号, 商品名称, 批号, 有效期至\nHAVING SUM(入库数量)-SUM(出库数量) > 0\n   AND CAST(有效期至 AS DATE) <= DATEADD(month, 6, CAST('2026-09-30' AS DATE))\nORDER BY 有效期至, 仓库名称",
+      "reason": "列出基准日2026-09-30仍有库存的近效期批次",
+      "message": "final_result",
+      "rowCount": 6,
+      "error": null,
+      "durationMs": 62
+     },
+     {
+      "step": 9,
+      "action": "synthesize",
+      "sql": "",
+      "reason": "",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 9,
+     "llmErrors": 0,
+     "promptTokens": 106308,
+     "completionTokens": 6559,
+     "cachedPromptTokens": 77568
+    },
+    "latencyMs": 30131,
+    "error": null
+   }
+  },
+  {
+   "id": "R02",
+   "category": "docs_and_data",
+   "question": "按照公司的安全库存标准，长沙中心仓当前哪些商品的库存低于安全库存？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "**长沙中心仓有 5 个商品当前库存低于安全库存：**\n\n| 商品编号 | 商品名称 | 类别 | 现有库存 | 安全库存 |\n|---|---|---|---|---|\n| YP3004 | 金银花 | 中药饮片 | 0 | 20 |\n| YP4004 | 医用雾化器 | 医疗器械 | 0 | 5 |\n| YP6003 | 蛋白粉 | 保健食品 | 0 | 10 |\n| YP1012 | 左氧氟沙星片 | 西药 | 39 | 50 |\n| YP1009 | 蒙脱石散 | 西药 | 45 | 50 |\n\n**说明：**\n- 依据《安全库存与补货策略》2.1 中心仓标准（按商品类别：西药 50、中成药 40、中药饮片 20、医疗器械 5、医用耗材 60、保健食品 10），用各商品在长沙中心仓的\"现有库存\"（数据截至 2026-09-30）比对。\n- 季节性调整（2.3）本期不适用：防暑类旺季 6–8 月已结束，感冒类旺季 12 月–次年 2 月尚未进入提前 1 个月的窗口（11 月），故按基础标准执行。\n- 其中金银花、医用雾化器、蛋白粉库存为 0，属于最紧急，按 3.1 补货触发规则应生成补货建议并由采购部在 1 个工作日内确认下单。",
+    "finalSql": "SELECT 商品编号, 商品名称, 商品类别,\n       MAX(现有库存) AS 现有库存,\n       CASE 商品类别 WHEN N'西药' THEN 50 WHEN N'中成药' THEN 40 WHEN N'中药饮片' THEN 20\n                     WHEN N'医疗器械' THEN 5 WHEN N'医用耗材' THEN 60 WHEN N'保健食品' THEN 10 END AS 安全库存\nFROM dbo.inout\nWHERE 仓库名称 = N'长沙中心仓'\nGROUP BY 商品编号, 商品名称, 商品类别\nHAVING MAX(现有库存) < CASE 商品类别 WHEN N'西药' THEN 50 WHEN N'中成药' THEN 40 WHEN N'中药饮片' THEN 20\n                     WHEN N'医疗器械' THEN 5 WHEN N'医用耗材' THEN 60 WHEN N'保健食品' THEN 10 END\nORDER BY 现有库存",
+    "rowCount": 5,
+    "rows": [
+     {
+      "商品编号": "YP3004",
+      "商品名称": "金银花",
+      "商品类别": "中药饮片",
+      "现有库存": 0.0,
+      "安全库存": 20
+     },
+     {
+      "商品编号": "YP4004",
+      "商品名称": "医用雾化器",
+      "商品类别": "医疗器械",
+      "现有库存": 0.0,
+      "安全库存": 5
+     },
+     {
+      "商品编号": "YP6003",
+      "商品名称": "蛋白粉",
+      "商品类别": "保健食品",
+      "现有库存": 0.0,
+      "安全库存": 10
+     },
+     {
+      "商品编号": "YP1012",
+      "商品名称": "左氧氟沙星片",
+      "商品类别": "西药",
+      "现有库存": 39.0,
+      "安全库存": 50
+     },
+     {
+      "商品编号": "YP1009",
+      "商品名称": "蒙脱石散",
+      "商品类别": "西药",
+      "现有库存": 45.0,
+      "安全库存": 50
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "describe_table",
+      "sql": "",
+      "reason": "dbo.inout",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 130
+     },
+     {
+      "step": 1,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "安全库存标准 定义",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 627
+     },
+     {
+      "step": 2,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "季节性商品 感冒类 防暑类 具体商品清单",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 476
+     },
+     {
+      "step": 2,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "当前库存 现有库存 口径 使用哪一个字段",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 511
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT 商品编号, 商品名称, 商品类别,\n       MAX(现有库存) AS 现有库存,\n       CASE 商品类别 WHEN N'西药' THEN 50 WHEN N'中成药' THEN 40 WHEN N'中药饮片' THEN 20\n                     WHEN N'医疗器械' THEN 5 WHEN N'医用耗材' THEN 60 WHEN N'保健食品' THEN 10 END AS 安全库存\nFROM dbo.inout\nWHERE 仓库名称 = N'长沙中心仓'\nGROUP BY 商品编号, 商品名称, 商品类别\nHAVING MAX(现有库存) < CASE 商品类别 WHEN N'西药' THEN 50 WHEN N'中成药' THEN 40 WHEN N'中药饮片' THEN 20\n                     WHEN N'医疗器械' THEN 5 WHEN N'医用耗材' THEN 60 WHEN N'保健食品' THEN 10 END\nORDER BY 现有库存",
+      "reason": "查长沙中心仓各商品当前库存与类别安全库存，筛选低于安全库存的",
+      "message": "final_result",
+      "rowCount": 5,
+      "error": null,
+      "durationMs": 40
+     },
+     {
+      "step": 4,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "**长沙中心仓有 5 个商品当前库存低于安全库存：**\n\n| 商品编号 | 商品名称 | 类别 | 现有库存 | 安全库存 |\n|---|---|---|---|---|\n| YP3004 | 金银花 | 中药饮片 | 0 | 20 |\n| YP4004 | 医用雾化器 | 医疗器械 | 0 | 5 |\n| YP6003 | 蛋白粉 | 保健食品 | 0 | 10 |\n| YP1012 | 左氧氟沙星片 | 西药 | 39 | 50 |\n| YP1009 | 蒙脱石散 | 西药 | 45 | 50 |\n\n**说明：**\n- 依据《安全库存与补货策略》2.1 中心仓标准（按商品类别：西药 50、中成药 40、中药饮片 20、医疗器械 5、医用耗材 60、保健食品 10），用各商品在长沙中心仓的\"现有库存\"（数据截至 2026-09-30）比对。\n- 季节性调整（2.3）本期不适用：防暑类旺季 6–8 月已结束，感冒类旺季 12 月–次年 2 月尚未进入提前 1 个月的窗口（11 月），故按基础标准执行。\n- 其中金银花、医用雾化器、蛋白粉库存为 0，属于最紧急，按 3.1 补货触发规则应生成补货建议并由采购部在 1 个工作日内确认下单。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 4,
+     "llmErrors": 0,
+     "promptTokens": 13427,
+     "completionTokens": 1438,
+     "cachedPromptTokens": 9600
+    },
+    "latencyMs": 8578,
+    "error": null
+   }
+  },
+  {
+   "id": "R03",
+   "category": "docs_and_data",
+   "question": "根据盘点管理办法中的二次复核标准，今年有哪些盘点调整记录需要二次复核？列出日期、仓库和商品。",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "## 结论\n\n依据《盘点管理办法》第四章 4.1 二次复核标准：**单条盘点差异数量 ≥ 3 个，或单条差异金额 ≥ 100 元**，需由仓库主管组织二次复核。\n\n2026 年共有 **7 条**盘点调整记录达到该标准：\n\n| 日期 | 仓库 | 商品 | 差异数量 | 差异金额 | 触发原因 |\n|---|---|---|---|---|---|\n| 2026-02-28 | 长沙中心仓 | 电子血压计 | 2（盘盈） | 256.00 | 金额≥100 |\n| 2026-03-31 | 湘潭前置仓 | 盐酸二甲双胍片 | 3（盘亏） | 28.80 | 数量≥3 |\n| 2026-04-30 | 株洲前置仓 | 电子血压计 | 1（盘盈） | 128.00 | 金额≥100 |\n| 2026-05-31 | 湘潭前置仓 | 金银花 | 2（盘亏） | 104.00 | 金额≥100 |\n| 2026-07-31 | 株洲前置仓 | 金银花 | 2（盘亏） | 104.00 | 金额≥100 |\n| 2026-09-30 | 湘潭前置仓 | 蒙脱石散 | 3（盘亏） | 29.70 | 数量≥3 |\n| 2026-09-30 | 湘潭前置仓 | 医用棉签 | 3（盘亏） | 6.30 | 数量≥3 |\n\n## 说明\n\n- 今年（2026 年）盘点调整记录共 35 条，其中 7 条触发二次复核，占比 20%。\n- 差异数量取盘盈的入库数量或盘亏的出库数量（每行仅一方有值），差异金额取开单金额。\n- 注意：有 3 条记录（电子血压计 256 元、128 元，金银花 104 元×2）虽然差异数量只有 1~2 个，但金额超过了 100 元阈值，同样需要复核；另有 3 条数量达到 3 个。\n- 按规则复核结果还需由财务监盘人员签字。",
+    "finalSql": "SELECT 按日期, 仓库名称, 商品名称, (入库数量 + 出库数量) AS 差异数量, 开单金额 AS 差异金额, CASE WHEN 入库数量 > 0 THEN N'盘盈' ELSE N'盘亏' END AS 差异方向 FROM dbo.inout WHERE 单据类型 = N'盘点调整' AND YEAR(CAST(按日期 AS DATE)) = 2026 AND ((入库数量 + 出库数量) >= 3 OR 开单金额 >= 100) ORDER BY CAST(按日期 AS DATE), 仓库名称",
+    "rowCount": 7,
+    "rows": [
+     {
+      "按日期": "2026-02-28",
+      "仓库名称": "长沙中心仓",
+      "商品名称": "电子血压计",
+      "差异数量": 2.0,
+      "差异金额": 256.0,
+      "差异方向": "盘盈"
+     },
+     {
+      "按日期": "2026-03-31",
+      "仓库名称": "湘潭前置仓",
+      "商品名称": "盐酸二甲双胍片",
+      "差异数量": 3.0,
+      "差异金额": 28.8,
+      "差异方向": "盘亏"
+     },
+     {
+      "按日期": "2026-04-30",
+      "仓库名称": "株洲前置仓",
+      "商品名称": "电子血压计",
+      "差异数量": 1.0,
+      "差异金额": 128.0,
+      "差异方向": "盘盈"
+     },
+     {
+      "按日期": "2026-05-31",
+      "仓库名称": "湘潭前置仓",
+      "商品名称": "金银花",
+      "差异数量": 2.0,
+      "差异金额": 104.0,
+      "差异方向": "盘亏"
+     },
+     {
+      "按日期": "2026-07-31",
+      "仓库名称": "株洲前置仓",
+      "商品名称": "金银花",
+      "差异数量": 2.0,
+      "差异金额": 104.0,
+      "差异方向": "盘亏"
+     },
+     {
+      "按日期": "2026-09-30",
+      "仓库名称": "湘潭前置仓",
+      "商品名称": "蒙脱石散",
+      "差异数量": 3.0,
+      "差异金额": 29.7,
+      "差异方向": "盘亏"
+     },
+     {
+      "按日期": "2026-09-30",
+      "仓库名称": "湘潭前置仓",
+      "商品名称": "医用棉签",
+      "差异数量": 3.0,
+      "差异金额": 6.3,
+      "差异方向": "盘亏"
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "盘点管理办法 二次复核标准",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 578
+     },
+     {
+      "step": 1,
+      "action": "list_tables",
+      "sql": "",
+      "reason": "",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     },
+     {
+      "step": 2,
+      "action": "describe_table",
+      "sql": "",
+      "reason": "dbo.inout",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT COUNT(*) AS 总行数 FROM dbo.inout WHERE 单据类型 = N'盘点调整' AND YEAR(CAST(按日期 AS DATE)) = 2026",
+      "reason": "先看今年盘点调整记录总量",
+      "message": "",
+      "rowCount": 1,
+      "error": null,
+      "durationMs": 24
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT TOP 20 按日期, 单据编号, 仓库名称, 商品名称, 入库数量, 出库数量, 开单金额, CASE WHEN 入库数量 >= 3 THEN N'盘盈' ELSE N'盘亏' END AS 方向 FROM dbo.inout WHERE 单据类型 = N'盘点调整' AND YEAR(CAST(按日期 AS DATE)) = 2026 ORDER BY CAST(按日期 AS DATE)",
+      "reason": "查看盘点调整记录样例",
+      "message": "",
+      "rowCount": 20,
+      "error": null,
+      "durationMs": 9
+     },
+     {
+      "step": 4,
+      "action": "run_sql",
+      "sql": "SELECT 按日期, 仓库名称, 商品名称, (入库数量 + 出库数量) AS 差异数量, 开单金额 AS 差异金额, CASE WHEN 入库数量 > 0 THEN N'盘盈' ELSE N'盘亏' END AS 差异方向 FROM dbo.inout WHERE 单据类型 = N'盘点调整' AND YEAR(CAST(按日期 AS DATE)) = 2026 AND ((入库数量 + 出库数量) >= 3 OR 开单金额 >= 100) ORDER BY CAST(按日期 AS DATE), 仓库名称",
+      "reason": "按二次复核标准筛选今年盘点调整记录",
+      "message": "final_result",
+      "rowCount": 7,
+      "error": null,
+      "durationMs": 32
+     },
+     {
+      "step": 5,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "## 结论\n\n依据《盘点管理办法》第四章 4.1 二次复核标准：**单条盘点差异数量 ≥ 3 个，或单条差异金额 ≥ 100 元**，需由仓库主管组织二次复核。\n\n2026 年共有 **7 条**盘点调整记录达到该标准：\n\n| 日期 | 仓库 | 商品 | 差异数量 | 差异金额 | 触发原因 |\n|---|---|---|---|---|---|\n| 2026-02-28 | 长沙中心仓 | 电子血压计 | 2（盘盈） | 256.00 | 金额≥100 |\n| 2026-03-31 | 湘潭前置仓 | 盐酸二甲双胍片 | 3（盘亏） | 28.80 | 数量≥3 |\n| 2026-04-30 | 株洲前置仓 | 电子血压计 | 1（盘盈） | 128.00 | 金额≥100 |\n| 2026-05-31 | 湘潭前置仓 | 金银花 | 2（盘亏） | 104.00 | 金额≥100 |\n| 2026-07-31 | 株洲前置仓 | 金银花 | 2（盘亏） | 104.00 | 金额≥100 |\n| 2026-09-30 | 湘潭前置仓 | 蒙脱石散 | 3（盘亏） | 29.70 | 数量≥3 |\n| 2026-09-30 | 湘潭前置仓 | 医用棉签 | 3（盘亏） | 6.30 | 数量≥3 |\n\n## 说明\n\n- 今年（2026 年）盘点调整记录共 35 条，其中 7 条触发二次复核，占比 20%。\n- 差异数量取盘盈的入库数量或盘亏的出库数量（每行仅一方有值），差异金额取开单金额。\n- 注意：有 3 条记录（电子血压计 256 元、128 元，金银花 104 元×2）虽然差异数量只有 1~2 个，但金额超过了 100 元阈值，同样需要复核；另有 3 条数量达到 3 个。\n- 按规则复核结果还需由财务监盘人员签字。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 5,
+     "llmErrors": 0,
+     "promptTokens": 16926,
+     "completionTokens": 1348,
+     "cachedPromptTokens": 12160
+    },
+    "latencyMs": 6971,
+    "error": null
+   }
+  },
+  {
+   "id": "R04",
+   "category": "docs_and_data",
+   "question": "按照公司的安全库存标准，株洲前置仓当前哪些商品的库存低于前置仓的安全库存？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "**结论：株洲前置仓共有 16 个商品库存低于安全库存**（其中 9 个库存为 0）。\n\n依据《安全库存与补货策略》：前置仓安全库存 = 中心仓同类别标准 × 20%（不足 1 按 1 计），即西药 10、中成药 8、中药饮片 4、医疗器械 1、医用耗材 12、保健食品 2。当前为 10 月，不处于感冒类（12 月–次年 2 月）、防暑类（6–8 月）旺季前 1 个月的提标窗口，故按基础标准判定。\n\n| 商品编号 | 商品名称 | 类别 | 现有库存 | 安全库存 | 缺口 |\n|---|---|---|---|---|---|\n| YP6003 | 蛋白粉 | 保健食品 | 0 | 2 | 2 |\n| YP6004 | 鱼油软胶囊 | 保健食品 | 0 | 2 | 2 |\n| YP1001 | 阿莫西林胶囊 | 西药 | 0 | 10 | 10 |\n| YP1007 | 氯雷他定片 | 西药 | 3 | 10 | 7 |\n| YP1011 | 硝苯地平控释片 | 西药 | 0 | 10 | 10 |\n| YP4001 | 电子血压计 | 医疗器械 | 0 | 1 | 1 |\n| YP4003 | 血糖试纸 | 医疗器械 | 0 | 1 | 1 |\n| YP4004 | 医用雾化器 | 医疗器械 | 0 | 1 | 1 |\n| YP5002 | 一次性使用无菌注射器 | 医用耗材 | 2 | 12 | 10 |\n| YP5006 | 医用检查手套 | 医用耗材 | 7 | 12 | 5 |\n| YP2002 | 连花清瘟胶囊 | 中成药 | 4 | 8 | 4 |\n| YP2005 | 六味地黄丸 | 中成药 | 0 | 8 | 8 |\n| YP3001 | 黄芪片 | 中药饮片 | 2 | 4 | 2 |\n| YP3002 | 当归片 | 中药饮片 | 0 | 4 | 4 |\n| YP3004 | 金银花 | 中药饮片 | 0 | 4 | 4 |\n| YP3005 | 党参段 | 中药饮片 | 0 | 4 | 4 |\n\n说明：库存取自流水表中「现有库存」字段（截至 2026-09-30 导出日）；前置仓不直接采购，缺口需按《调拨管理规定》由长沙中心仓调拨补充（目标库存为 12 天销量）。",
+    "finalSql": "SELECT 商品编号, 商品名称, 商品类别, 现有库存,\n       CASE 商品类别 WHEN N'西药' THEN 10 WHEN N'中成药' THEN 8 WHEN N'中药饮片' THEN 4\n                     WHEN N'医疗器械' THEN 1 WHEN N'医用耗材' THEN 12 WHEN N'保健食品' THEN 2 END AS 前置仓安全库存,\n       CASE 商品类别 WHEN N'西药' THEN 10 WHEN N'中成药' THEN 8 WHEN N'中药饮片' THEN 4\n                     WHEN N'医疗器械' THEN 1 WHEN N'医用耗材' THEN 12 WHEN N'保健食品' THEN 2 END - 现有库存 AS 缺口\nFROM dbo.inout\nWHERE 仓库名称 = N'株洲前置仓' AND 现有库存 IS NOT NULL\n  AND 现有库存 < CASE 商品类别 WHEN N'西药' THEN 10 WHEN N'中成药' THEN 8 WHEN N'中药饮片' THEN 4\n                               WHEN N'医疗器械' THEN 1 WHEN N'医用耗材' THEN 12 WHEN N'保健食品' THEN 2 END\nORDER BY 商品类别, 商品编号",
+    "rowCount": 16,
+    "rows": [
+     {
+      "商品编号": "YP6003",
+      "商品名称": "蛋白粉",
+      "商品类别": "保健食品",
+      "现有库存": 0.0,
+      "前置仓安全库存": 2,
+      "缺口": 2.0
+     },
+     {
+      "商品编号": "YP6004",
+      "商品名称": "鱼油软胶囊",
+      "商品类别": "保健食品",
+      "现有库存": 0.0,
+      "前置仓安全库存": 2,
+      "缺口": 2.0
+     },
+     {
+      "商品编号": "YP1001",
+      "商品名称": "阿莫西林胶囊",
+      "商品类别": "西药",
+      "现有库存": 0.0,
+      "前置仓安全库存": 10,
+      "缺口": 10.0
+     },
+     {
+      "商品编号": "YP1007",
+      "商品名称": "氯雷他定片",
+      "商品类别": "西药",
+      "现有库存": 3.0,
+      "前置仓安全库存": 10,
+      "缺口": 7.0
+     },
+     {
+      "商品编号": "YP1011",
+      "商品名称": "硝苯地平控释片",
+      "商品类别": "西药",
+      "现有库存": 0.0,
+      "前置仓安全库存": 10,
+      "缺口": 10.0
+     },
+     {
+      "商品编号": "YP4001",
+      "商品名称": "电子血压计",
+      "商品类别": "医疗器械",
+      "现有库存": 0.0,
+      "前置仓安全库存": 1,
+      "缺口": 1.0
+     },
+     {
+      "商品编号": "YP4003",
+      "商品名称": "血糖试纸",
+      "商品类别": "医疗器械",
+      "现有库存": 0.0,
+      "前置仓安全库存": 1,
+      "缺口": 1.0
+     },
+     {
+      "商品编号": "YP4004",
+      "商品名称": "医用雾化器",
+      "商品类别": "医疗器械",
+      "现有库存": 0.0,
+      "前置仓安全库存": 1,
+      "缺口": 1.0
+     },
+     {
+      "商品编号": "YP5002",
+      "商品名称": "一次性使用无菌注射器",
+      "商品类别": "医用耗材",
+      "现有库存": 2.0,
+      "前置仓安全库存": 12,
+      "缺口": 10.0
+     },
+     {
+      "商品编号": "YP5006",
+      "商品名称": "医用检查手套",
+      "商品类别": "医用耗材",
+      "现有库存": 7.0,
+      "前置仓安全库存": 12,
+      "缺口": 5.0
+     },
+     {
+      "商品编号": "YP2002",
+      "商品名称": "连花清瘟胶囊",
+      "商品类别": "中成药",
+      "现有库存": 4.0,
+      "前置仓安全库存": 8,
+      "缺口": 4.0
+     },
+     {
+      "商品编号": "YP2005",
+      "商品名称": "六味地黄丸",
+      "商品类别": "中成药",
+      "现有库存": 0.0,
+      "前置仓安全库存": 8,
+      "缺口": 8.0
+     },
+     {
+      "商品编号": "YP3001",
+      "商品名称": "黄芪片",
+      "商品类别": "中药饮片",
+      "现有库存": 2.0,
+      "前置仓安全库存": 4,
+      "缺口": 2.0
+     },
+     {
+      "商品编号": "YP3002",
+      "商品名称": "当归片",
+      "商品类别": "中药饮片",
+      "现有库存": 0.0,
+      "前置仓安全库存": 4,
+      "缺口": 4.0
+     },
+     {
+      "商品编号": "YP3004",
+      "商品名称": "金银花",
+      "商品类别": "中药饮片",
+      "现有库存": 0.0,
+      "前置仓安全库存": 4,
+      "缺口": 4.0
+     },
+     {
+      "商品编号": "YP3005",
+      "商品名称": "党参段",
+      "商品类别": "中药饮片",
+      "现有库存": 0.0,
+      "前置仓安全库存": 4,
+      "缺口": 4.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "前置仓安全库存标准",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 489
+     },
+     {
+      "step": 1,
+      "action": "list_tables",
+      "sql": "",
+      "reason": "",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     },
+     {
+      "step": 1,
+      "action": "describe_table",
+      "sql": "",
+      "reason": "dbo.inout",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     },
+     {
+      "step": 2,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "中心仓安全库存 各类别标准 天数",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 488
+     },
+     {
+      "step": 2,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "安全库存 计算 日均销量 类别标准明细",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 444
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT 商品编号, 商品名称, 商品类别, 现有库存,\n       CASE 商品类别 WHEN N'西药' THEN 10 WHEN N'中成药' THEN 8 WHEN N'中药饮片' THEN 4\n                     WHEN N'医疗器械' THEN 1 WHEN N'医用耗材' THEN 12 WHEN N'保健食品' THEN 2 END AS 安全库存\nFROM dbo.inout\nWHERE 仓库名称 = N'株洲前置仓' AND 现有库存 IS NOT NULL\nORDER BY 商品编号",
+      "reason": "查看株洲前置仓各商品当前库存与安全库存",
+      "message": "",
+      "rowCount": 38,
+      "error": null,
+      "durationMs": 22
+     },
+     {
+      "step": 4,
+      "action": "run_sql",
+      "sql": "SELECT 商品编号, 商品名称, 商品类别, 现有库存,\n       CASE 商品类别 WHEN N'西药' THEN 10 WHEN N'中成药' THEN 8 WHEN N'中药饮片' THEN 4\n                     WHEN N'医疗器械' THEN 1 WHEN N'医用耗材' THEN 12 WHEN N'保健食品' THEN 2 END AS 前置仓安全库存,\n       CASE 商品类别 WHEN N'西药' THEN 10 WHEN N'中成药' THEN 8 WHEN N'中药饮片' THEN 4\n                     WHEN N'医疗器械' THEN 1 WHEN N'医用耗材' THEN 12 WHEN N'保健食品' THEN 2 END - 现有库存 AS 缺口\nFROM dbo.inout\nWHERE 仓库名称 = N'株洲前置仓' AND 现有库存 IS NOT NULL\n  AND 现有库存 < CASE 商品类别 WHEN N'西药' THEN 10 WHEN N'中成药' THEN 8 WHEN N'中药饮片' THEN 4\n                               WHEN N'医疗器械' THEN 1 WHEN N'医用耗材' THEN 12 WHEN N'保健食品' THEN 2 END\nORDER BY 商品类别, 商品编号",
+      "reason": "返回株洲前置仓库存低于前置仓安全库存的商品清单",
+      "message": "final_result",
+      "rowCount": 16,
+      "error": null,
+      "durationMs": 33
+     },
+     {
+      "step": 5,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "**结论：株洲前置仓共有 16 个商品库存低于安全库存**（其中 9 个库存为 0）。\n\n依据《安全库存与补货策略》：前置仓安全库存 = 中心仓同类别标准 × 20%（不足 1 按 1 计），即西药 10、中成药 8、中药饮片 4、医疗器械 1、医用耗材 12、保健食品 2。当前为 10 月，不处于感冒类（12 月–次年 2 月）、防暑类（6–8 月）旺季前 1 个月的提标窗口，故按基础标准判定。\n\n| 商品编号 | 商品名称 | 类别 | 现有库存 | 安全库存 | 缺口 |\n|---|---|---|---|---|---|\n| YP6003 | 蛋白粉 | 保健食品 | 0 | 2 | 2 |\n| YP6004 | 鱼油软胶囊 | 保健食品 | 0 | 2 | 2 |\n| YP1001 | 阿莫西林胶囊 | 西药 | 0 | 10 | 10 |\n| YP1007 | 氯雷他定片 | 西药 | 3 | 10 | 7 |\n| YP1011 | 硝苯地平控释片 | 西药 | 0 | 10 | 10 |\n| YP4001 | 电子血压计 | 医疗器械 | 0 | 1 | 1 |\n| YP4003 | 血糖试纸 | 医疗器械 | 0 | 1 | 1 |\n| YP4004 | 医用雾化器 | 医疗器械 | 0 | 1 | 1 |\n| YP5002 | 一次性使用无菌注射器 | 医用耗材 \n...\nYP3002 | 当归片 | 中药饮片 | 0 | 4 | 4 |\n| YP3004 | 金银花 | 中药饮片 | 0 | 4 | 4 |\n| YP3005 | 党参段 | 中药饮片 | 0 | 4 | 4 |\n\n说明：库存取自流水表中「现有库存」字段（截至 2026-09-30 导出日）；前置仓不直接采购，缺口需按《调拨管理规定》由长沙中心仓调拨补充（目标库存为 12 天销量）。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 5,
+     "llmErrors": 0,
+     "promptTokens": 20725,
+     "completionTokens": 1838,
+     "cachedPromptTokens": 16256
+    },
+    "latencyMs": 9810,
+    "error": null
+   }
+  },
+  {
+   "id": "R05",
+   "category": "docs_and_data",
+   "question": "按照调拨管理规定，今年有哪些调拨单在前置仓收货时需要双人逐行复核？给出单据编号和明细行数。",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "**结论：2026 年共有 14 张调拨单需在前置仓收货时双人逐行复核。**\n\n依据《调拨管理规定》第三章 3.2 现场复核：\"单张调拨单明细超过 25 行的，前置仓收货时需由两名人员现场逐行复核，并在调拨单上双人签字。\"\n\n清单（按行数降序）：\n\n| 单据编号 | 明细行数 |\n|---|---|\n| DB20260103001 | 38 |\n| DB20260103002 | 38 |\n| DB20260216002 | 32 |\n| DB20260817002 | 31 |\n| DB20260511002 | 29 |\n| DB20260713002 | 27 |\n| DB20260216001 | 26 |\n| DB20260316001 | 26 |\n| DB20260323001 | 26 |\n| DB20260608001 | 26 |\n| DB20260706001 | 26 |\n| DB20260720001 | 26 |\n| DB20260810001 | 26 |\n| DB20260817001 | 26 |\n\n说明：\n- 统计口径为 2026-01-01 至 2026-12-31 的调拨单（数据实际覆盖到 2026-09-30）。\n- \"明细行数\"指该调拨单的商品批次明细条数。调拨出库行（长沙中心仓）与调拨入库行（株洲/湘潭前置仓）共用同一单据号，系统会同时生成两个方向的记录，两者行数一一对应，故按其中一个方向计数即为单据明细行数（如 DB20260103001 在流水表中两个方向各 38 行，合计 76 行）。\n- 恰好 25 行的调拨单（如 DB20260302001、DB20260511001 等）未超过 25 行，不在复核范围内。",
+    "finalSql": "SELECT 单据编号, COUNT(*) AS 明细行数\nFROM dbo.inout\nWHERE 单据类型 = N'调拨出库'\n  AND CAST(按日期 AS DATE) BETWEEN '2026-01-01' AND '2026-12-31'\nGROUP BY 单据编号\nHAVING COUNT(*) > 25\nORDER BY 明细行数 DESC, 单据编号",
+    "rowCount": 14,
+    "rows": [
+     {
+      "单据编号": "DB20260103001",
+      "明细行数": 38
+     },
+     {
+      "单据编号": "DB20260103002",
+      "明细行数": 38
+     },
+     {
+      "单据编号": "DB20260216002",
+      "明细行数": 32
+     },
+     {
+      "单据编号": "DB20260817002",
+      "明细行数": 31
+     },
+     {
+      "单据编号": "DB20260511002",
+      "明细行数": 29
+     },
+     {
+      "单据编号": "DB20260713002",
+      "明细行数": 27
+     },
+     {
+      "单据编号": "DB20260216001",
+      "明细行数": 26
+     },
+     {
+      "单据编号": "DB20260316001",
+      "明细行数": 26
+     },
+     {
+      "单据编号": "DB20260323001",
+      "明细行数": 26
+     },
+     {
+      "单据编号": "DB20260608001",
+      "明细行数": 26
+     },
+     {
+      "单据编号": "DB20260706001",
+      "明细行数": 26
+     },
+     {
+      "单据编号": "DB20260720001",
+      "明细行数": 26
+     },
+     {
+      "单据编号": "DB20260810001",
+      "明细行数": 26
+     },
+     {
+      "单据编号": "DB20260817001",
+      "明细行数": 26
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "describe_table",
+      "sql": "",
+      "reason": "dbo.inout",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     },
+     {
+      "step": 1,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "调拨管理规定 前置仓收货 双人逐行复核",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 511
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT 单据编号, 单据类型, COUNT(*) AS 行数 FROM dbo.inout WHERE 单据类型 IN (N'调拨出库',N'调拨入库') AND CAST(按日期 AS DATE) >= '2026-01-01' AND CAST(按日期 AS DATE) <= '2026-12-31' GROUP BY 单据编号, 单据类型 ORDER BY 单据编号",
+      "reason": "核对调拨单出库/入库行数分布",
+      "message": "",
+      "rowCount": 158,
+      "error": null,
+      "durationMs": 46
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT 单据编号, COUNT(*) AS 总行数, SUM(CASE WHEN 单据类型=N'调拨出库' THEN 1 ELSE 0 END) AS 出库行数, SUM(CASE WHEN 单据类型=N'调拨入库' THEN 1 ELSE 0 END) AS 入库行数, COUNT(DISTINCT 仓库名称) AS 仓库数 FROM dbo.inout WHERE 单据类型 IN (N'调拨出库',N'调拨入库') AND CAST(按日期 AS DATE) >= '2026-01-01' GROUP BY 单据编号 HAVING COUNT(*) > 25 ORDER BY 总行数 DESC",
+      "reason": "找出2026年行数超过25的调拨单",
+      "message": "",
+      "rowCount": 70,
+      "error": null,
+      "durationMs": 19
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT 单据编号,\n       COUNT(*) AS 明细行数,\n       MIN(按日期) AS 单据日期\nFROM dbo.inout\nWHERE 单据类型 = N'调拨出库'\n  AND CAST(按日期 AS DATE) BETWEEN '2026-01-01' AND '2026-12-31'\nGROUP BY 单据编号\nHAVING COUNT(*) > 25\nORDER BY 单据编号",
+      "reason": "按规则筛出2026年调拨明细超过25行的调拨单",
+      "message": "",
+      "rowCount": 14,
+      "error": null,
+      "durationMs": 35
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT 单据类型, 仓库名称, COUNT(*) AS 行数\nFROM dbo.inout\nWHERE 单据类型 IN (N'调拨出库', N'调拨入库')\n  AND CAST(按日期 AS DATE) BETWEEN '2026-01-01' AND '2026-12-31'\nGROUP BY 单据类型, 仓库名称",
+      "reason": "确认调拨出库/入库行分别发生在哪些仓库",
+      "message": "",
+      "rowCount": 3,
+      "error": null,
+      "durationMs": 17
+     },
+     {
+      "step": 4,
+      "action": "run_sql",
+      "sql": "SELECT 单据编号, COUNT(*) AS 明细行数\nFROM dbo.inout\nWHERE 单据类型 = N'调拨出库'\n  AND CAST(按日期 AS DATE) BETWEEN '2026-01-01' AND '2026-12-31'\nGROUP BY 单据编号\nHAVING COUNT(*) > 25\nORDER BY 明细行数 DESC, 单据编号",
+      "reason": "最终清单：2026年明细超25行、前置仓收货需双人逐行复核的调拨单",
+      "message": "final_result",
+      "rowCount": 14,
+      "error": null,
+      "durationMs": 11
+     },
+     {
+      "step": 5,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "**结论：2026 年共有 14 张调拨单需在前置仓收货时双人逐行复核。**\n\n依据《调拨管理规定》第三章 3.2 现场复核：\"单张调拨单明细超过 25 行的，前置仓收货时需由两名人员现场逐行复核，并在调拨单上双人签字。\"\n\n清单（按行数降序）：\n\n| 单据编号 | 明细行数 |\n|---|---|\n| DB20260103001 | 38 |\n| DB20260103002 | 38 |\n| DB20260216002 | 32 |\n| DB20260817002 | 31 |\n| DB20260511002 | 29 |\n| DB20260713002 | 27 |\n| DB20260216001 | 26 |\n| DB20260316001 | 26 |\n| DB20260323001 | 26 |\n| DB20260608001 | 26 |\n| DB20260706001 | 26 |\n| DB20260720001 | 26 |\n| DB20260810001 | 26 |\n| DB20260817001 | 26 |\n\n说明：\n- 统计口径为 2026-01-01 至 2026-12-31 的调拨单（数据实际覆盖到 2026-09-30）。\n- \"明细行数\"指该调拨单的商品批次明细条数。调拨出库行（长沙中心仓）与调拨入库行（株洲/湘潭前置仓）共用同一单据号，系统会同时生成两个方向的记录，两者行数一一对应，故按其中一个方向计数即为单据明细行数（如 DB20260103001 在流水表中两个方向各 38 行，合计 76 行）。\n- 恰好 25 行的调拨单（如 DB20260302001、DB20260511001 等）未超过 25 行，不在复核范围内。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 5,
+     "llmErrors": 0,
+     "promptTokens": 24993,
+     "completionTokens": 2925,
+     "cachedPromptTokens": 20736
+    },
+    "latencyMs": 13839,
+    "error": null
+   }
+  },
+  {
+   "id": "R06",
+   "category": "docs_and_data",
+   "question": "按照供应商管理办法的分级标准，今年采购入库金额已经达到 A 类标准的供应商有哪些？",
+   "ok": true,
+   "reason": "",
+   "trace": {
+    "answer": "**结论：2026 年采购入库金额达到 A 类标准（≥10 万元）的供应商有 2 家：**\n\n| 供应商名称 | 2026年采购入库金额（元） |\n|---|---|\n| 百草堂中药饮片有限公司 | 165,377.40 |\n| 康源医疗器械有限公司 | 148,855.00 |\n\n**说明：**\n- 依据《供应商管理办法》3.1 分级标准：年采购入库金额达到 10 万元（含）的为 A 类供应商，3 万元（含）至 10 万元为 B 类，不足 3 万元为 C 类。A 类供应商需**每季度评审一次**。\n- 口径：单据类型取\"N采购入库\"（不含采购退货等），金额用开单金额合计，期间为 2026-01-01 至 2026-10-11。\n- 其余 5 家今年入库金额在 5.2 万～7.4 万元之间，按标准属于 B 类：瑞丰药业 73,625.90、和润健康食品 73,601.00、恒信生物制药 72,036.00、安泰医用耗材 55,105.00、华康医药 52,005.40。\n\n**提醒**：办法规定分级是按**上一自然年度**的采购入库金额确定，且新引入供应商当年按 C 类管理。所以上面的结果是\"今年累计金额已越过 10 万元线\"的供应商，若要正式定级，应以 2025 年全年数据为准（需要的话我可以再查）。",
+    "finalSql": "SELECT 供应商名称, SUM(开单金额) AS 采购入库金额\nFROM dbo.inout\nWHERE 单据类型 = N'采购入库' AND YEAR(CAST(按日期 AS DATE)) = 2026\nGROUP BY 供应商名称\nHAVING SUM(开单金额) >= 100000\nORDER BY 采购入库金额 DESC",
+    "rowCount": 2,
+    "rows": [
+     {
+      "供应商名称": "百草堂中药饮片有限公司",
+      "采购入库金额": 165377.4
+     },
+     {
+      "供应商名称": "康源医疗器械有限公司",
+      "采购入库金额": 148855.0
+     }
+    ],
+    "steps": [
+     {
+      "step": 1,
+      "action": "search_docs",
+      "sql": "",
+      "reason": "供应商分级标准 A类供应商 采购入库金额",
+      "message": "",
+      "rowCount": 4,
+      "error": null,
+      "durationMs": 494
+     },
+     {
+      "step": 1,
+      "action": "describe_table",
+      "sql": "",
+      "reason": "dbo.inout",
+      "message": "",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     },
+     {
+      "step": 2,
+      "action": "run_sql",
+      "sql": "SELECT 供应商名称, SUM(开单金额) AS 采购入库金额\nFROM dbo.inout\nWHERE 单据类型 = N'采购入库' AND YEAR(CAST(按日期 AS DATE)) = 2026\nGROUP BY 供应商名称\nHAVING SUM(开单金额) >= 100000\nORDER BY 采购入库金额 DESC",
+      "reason": "统计2026年各供应商采购入库金额，筛选达到10万元A类标准的",
+      "message": "final_result",
+      "rowCount": 2,
+      "error": null,
+      "durationMs": 35
+     },
+     {
+      "step": 3,
+      "action": "run_sql",
+      "sql": "SELECT 供应商名称, SUM(开单金额) AS 采购入库金额\nFROM dbo.inout\nWHERE 单据类型 = N'采购入库' AND YEAR(CAST(按日期 AS DATE)) = 2026\nGROUP BY 供应商名称\nORDER BY 采购入库金额 DESC",
+      "reason": "列出全部供应商2026年采购入库金额以作对照",
+      "message": "",
+      "rowCount": 7,
+      "error": null,
+      "durationMs": 22
+     },
+     {
+      "step": 4,
+      "action": "final",
+      "sql": "",
+      "reason": "",
+      "message": "**结论：2026 年采购入库金额达到 A 类标准（≥10 万元）的供应商有 2 家：**\n\n| 供应商名称 | 2026年采购入库金额（元） |\n|---|---|\n| 百草堂中药饮片有限公司 | 165,377.40 |\n| 康源医疗器械有限公司 | 148,855.00 |\n\n**说明：**\n- 依据《供应商管理办法》3.1 分级标准：年采购入库金额达到 10 万元（含）的为 A 类供应商，3 万元（含）至 10 万元为 B 类，不足 3 万元为 C 类。A 类供应商需**每季度评审一次**。\n- 口径：单据类型取\"N采购入库\"（不含采购退货等），金额用开单金额合计，期间为 2026-01-01 至 2026-10-11。\n- 其余 5 家今年入库金额在 5.2 万～7.4 万元之间，按标准属于 B 类：瑞丰药业 73,625.90、和润健康食品 73,601.00、恒信生物制药 72,036.00、安泰医用耗材 55,105.00、华康医药 52,005.40。\n\n**提醒**：办法规定分级是按**上一自然年度**的采购入库金额确定，且新引入供应商当年按 C 类管理。所以上面的结果是\"今年累计金额已越过 10 万元线\"的供应商，若要正式定级，应以 2025 年全年数据为准（需要的话我可以再查）。",
+      "rowCount": null,
+      "error": null,
+      "durationMs": 0
+     }
+    ],
+    "usage": {
+     "llmCalls": 4,
+     "llmErrors": 0,
+     "promptTokens": 12048,
+     "completionTokens": 1021,
+     "cachedPromptTokens": 9856
+    },
+    "latencyMs": 6041,
+    "error": null
+   }
+  }
+ ]
+}
