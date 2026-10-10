@@ -1,0 +1,44 @@
+# 本地开发与评测用的数据库。用法：
+#   docker compose -f docker-compose.dev.yml --env-file my-ai/.env up -d
+# Apple Silicon 上 SQL Server 通过 Rosetta 以 amd64 运行。
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: wms-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in my-ai/.env}
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - wms-mssql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  # 资料问答的向量库（pgvector），与业务库 SQL Server 分开
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: wms-pgvector
+    environment:
+      POSTGRES_DB: wms_rag
+      POSTGRES_USER: wms_rag
+      POSTGRES_PASSWORD: ${RAG_DB_PASSWORD:?set RAG_DB_PASSWORD in my-ai/.env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - wms-pgvector-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wms_rag -d wms_rag"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  wms-mssql-data:
+  wms-pgvector-data:

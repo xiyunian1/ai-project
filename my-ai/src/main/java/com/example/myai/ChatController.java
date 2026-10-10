@@ -25,16 +25,13 @@ import java.util.Map;
 @Validated
 public class ChatController {
     private final ChatService chatService;
-    private final SqlChatService sqlChatService;
     private final SqlAnalysisService sqlAnalysisService;
 
     public ChatController(
             ChatService chatService,
-            SqlChatService sqlChatService,
             SqlAnalysisService sqlAnalysisService
     ) {
         this.chatService = chatService;
-        this.sqlChatService = sqlChatService;
         this.sqlAnalysisService = sqlAnalysisService;
     }
 
@@ -58,23 +55,15 @@ public class ChatController {
         return chatService.chatStream(query, authUsername);
     }
 
-    @GetMapping("/chat/sql")
-    public Map<String, Object> chatBySqlServer(
-            @RequestParam
-            @NotBlank(message = "query cannot be empty")
-            @Size(max = 2000, message = "query is too long (max 2000)") String query
+    @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<String> chatStreamWithConfig(
+            @RequestBody ChatStreamRequest request,
+            @RequestAttribute(value = AuthInterceptor.ATTR_USERNAME, required = false) String authUsername
     ) {
-        SqlChatService.SqlChatResult result = sqlChatService.query(query);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("code", 200);
-        body.put("message", "SQL Server query success");
-        body.put("mode", "sqlserver");
-        body.put("answer", result.answer());
-        body.put("sql", result.sqlTemplate());
-        body.put("rowCount", result.rowCount());
-        body.put("rows", result.rows());
-        return body;
+        if (request == null) {
+            return Flux.error(new ApiException(HttpStatus.BAD_REQUEST, "request body is required"));
+        }
+        return chatService.chatStream(request.query(), authUsername, request.modelConfig());
     }
 
     @GetMapping("/chat/analyze")
@@ -96,14 +85,53 @@ public class ChatController {
         return body;
     }
 
+    /** 返回完整 Agent 轨迹（每步动作、SQL、token、耗时），供 eval/run_sql_eval.py 离线评测。 */
+    @PostMapping("/chat/analyze/trace")
+    public SqlAnalysisService.TracedAnalysisResult analyzeWithTrace(
+            @RequestBody AnalysisStreamRequest request,
+            @RequestAttribute(value = AuthInterceptor.ATTR_USERNAME, required = false) String authUsername
+    ) {
+        if (request == null || request.query() == null || request.query().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "query cannot be empty");
+        }
+        return sqlAnalysisService.analyzeWithTrace(request.query(), request.history(), request.modelConfig(),
+                request.agentMode(), authUsername);
+    }
+
+    /** 资料问答的评测接口：返回回答、命中的分块、上下文长度、token 用量和耗时。knowledgeMode 可选 stuff 或检索模式。 */
+    @PostMapping("/chat/knowledge/trace")
+    public Map<String, Object> knowledgeAnswerWithTrace(
+            @RequestBody KnowledgeTraceRequest request,
+            @RequestAttribute(value = AuthInterceptor.ATTR_USERNAME, required = false) String authUsername
+    ) {
+        if (request == null || request.query() == null || request.query().isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "query cannot be empty");
+        }
+        return chatService.answerWithTrace(request.query(), authUsername, request.modelConfig(), request.knowledgeMode());
+    }
+
     @PostMapping(value = "/chat/analyze/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> analyzeBySqlServerStream(
-            @RequestBody AnalysisStreamRequest request
+            @RequestBody AnalysisStreamRequest request,
+            @RequestAttribute(value = AuthInterceptor.ATTR_USERNAME, required = false) String authUsername
     ) {
         if (request == null) {
             return Flux.error(new ApiException(HttpStatus.BAD_REQUEST, "request body is required"));
         }
-        return sqlAnalysisService.analyzeStream(request.query(), request.history(), request.dbConfig());
+        return sqlAnalysisService.analyzeStream(request.query(), request.history(), request.dbConfig(), request.modelConfig(), authUsername);
+    }
+
+    @PostMapping("/models")
+    public Map<String, Object> listModels(@RequestBody(required = false) ModelListRequest request) {
+        String baseUrl = request == null ? null : request.baseUrl();
+        String apiKey = request == null ? null : request.apiKey();
+        List<String> models = chatService.listModels(baseUrl, apiKey);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("code", 200);
+        body.put("message", "Models loaded");
+        body.put("models", models);
+        return body;
     }
 
     @PostMapping("/chat/image")
@@ -125,7 +153,31 @@ public class ChatController {
             @Size(max = 2000, message = "query is too long (max 2000)")
             String query,
             List<SqlAnalysisService.HistoryTurn> history,
-            SqlAnalysisService.DbConnectionConfig dbConfig
+            SqlAnalysisService.DbConnectionConfig dbConfig,
+            SqlAnalysisService.ModelConnectionConfig modelConfig,
+            /* 可选：json 或 tools，仅评测接口使用；为空时用 analysis.agent.mode 配置 */
+            String agentMode
+    ) {
+    }
+
+    public record KnowledgeTraceRequest(
+            String query,
+            SqlAnalysisService.ModelConnectionConfig modelConfig,
+            String knowledgeMode
+    ) {
+    }
+
+    public record ChatStreamRequest(
+            @NotBlank(message = "query cannot be empty")
+            @Size(max = 2000, message = "query is too long (max 2000)")
+            String query,
+            SqlAnalysisService.ModelConnectionConfig modelConfig
+    ) {
+    }
+
+    public record ModelListRequest(
+            String baseUrl,
+            String apiKey
     ) {
     }
 }

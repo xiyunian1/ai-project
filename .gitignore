@@ -2,6 +2,20 @@
 .vscode/
 *.log
 tmp-*
+.env
+.env.*
+!.env.example
+node_modules/
+ai-frontend/node_modules/
+ai-frontend/dist/
 ai-frontend/dist-app/
 ai-frontend/dist-electron/
 my-ai/node_modules/
+my-ai/target/
+
+# eval
+.venv/
+__pycache__/
+
+# AI 编码工具的本地日志
+.learnings/

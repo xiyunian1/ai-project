@@ -4,6 +4,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.ToolResponseMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.support.ToolCallbacks;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -65,6 +79,10 @@ public class SqlAnalysisService {
     private static final String DEFAULT_SQLSERVER_DRIVER = "net.sourceforge.jtds.jdbc.Driver";
     private static final int DEFAULT_SQLSERVER_PORT = 1433;
     private static final ThreadLocal<ExecutionContext> EXECUTION_CONTEXT = new ThreadLocal<>();
+    private static final ThreadLocal<ModelConnectionConfig> MODEL_CONTEXT = new ThreadLocal<>();
+    private static final ThreadLocal<RunTrace> RUN_TRACE = new ThreadLocal<>();
+    /** 当前登录用户，search_docs 只检索该用户上传的资料。 */
+    private static final ThreadLocal<String> USER_CONTEXT = new ThreadLocal<>();
 
     @Value("${nl2sql.provider:deepseek}")
     private String provider;
@@ -84,39 +102,65 @@ public class SqlAnalysisService {
     @Value("${analysis.max-cell-length:120}")
     private int analysisMaxCellLength;
 
-    @Value("${dify.api-key:}")
-    private String difyApiKey;
+    @Value("${analysis.custom-db-enabled:false}")
+    private boolean customDbEnabled;
 
-    @Value("${dify.base-url:http://localhost:8080/v1}")
-    private String difyBaseUrl;
-
-    @Value("${analysis.agent.request-timeout-seconds:${dify.request-timeout-seconds:45}}")
+    @Value("${analysis.agent.request-timeout-seconds:${llm.request-timeout-seconds:45}}")
     private long requestTimeoutSeconds;
 
-    @Value("${deepseek.api-key:}")
+    @Value("${llm.api-key:${deepseek.api-key:}}")
     private String deepseekApiKey;
 
-    @Value("${deepseek.base-url:https://api.deepseek.com}")
+    @Value("${llm.base-url:${deepseek.base-url:https://api.deepseek.com}}")
     private String deepseekBaseUrl;
 
-    @Value("${deepseek.model:deepseek-chat}")
+    @Value("${llm.model:${deepseek.model:deepseek-chat}}")
     private String deepseekModel;
 
-    private final SqlChatService sqlChatService;
+    /** json：模型输出 JSON 文本动作（原实现）；tools：原生 Function Calling。 */
+    @Value("${analysis.agent.mode:json}")
+    private String agentMode = "json";
+
+    @Value("${analysis.agent.max-tool-turns:8}")
+    private int maxToolTurns = 8;
+
     private final JdbcTemplate jdbcTemplate;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
+    private final AgentChatModelFactory chatModelFactory;
+    private final com.example.myai.rag.KnowledgeIndexService knowledgeIndexService;
+    private final Map<String, CachedTableDescription> tableDescriptionCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     public SqlAnalysisService(
-            SqlChatService sqlChatService,
             JdbcTemplate jdbcTemplate,
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper
     ) {
-        this.sqlChatService = sqlChatService;
+        this(jdbcTemplate, webClientBuilder, objectMapper, new AgentChatModelFactory(), null);
+    }
+
+    public SqlAnalysisService(
+            JdbcTemplate jdbcTemplate,
+            WebClient.Builder webClientBuilder,
+            ObjectMapper objectMapper,
+            AgentChatModelFactory chatModelFactory
+    ) {
+        this(jdbcTemplate, webClientBuilder, objectMapper, chatModelFactory, null);
+    }
+
+    @Autowired
+    public SqlAnalysisService(
+            JdbcTemplate jdbcTemplate,
+            WebClient.Builder webClientBuilder,
+            ObjectMapper objectMapper,
+            AgentChatModelFactory chatModelFactory,
+            com.example.myai.rag.KnowledgeIndexService knowledgeIndexService
+    ) {
         this.jdbcTemplate = jdbcTemplate;
         this.webClient = webClientBuilder.build();
         this.objectMapper = objectMapper;
+        this.chatModelFactory = chatModelFactory;
+        this.knowledgeIndexService = knowledgeIndexService;
     }
 
     public AnalysisResult analyze(String rawQuery) {
@@ -134,12 +178,10 @@ public class SqlAnalysisService {
             List<HistoryTurn> safeHistory = normalizeHistory(history);
             String effectiveQuery = applyContextHints(userQuery, safeHistory);
 
-            AgentRunResult runResult = runAgent(userQuery, effectiveQuery, safeHistory, null);
+            AgentRunResult runResult = runConfiguredAgent(null, userQuery, effectiveQuery, safeHistory, null, null);
             String answer = mergeAnswerWithToolTail(runResult.answer(), runResult.toolResults());
 
-            ToolResult last = runResult.toolResults().isEmpty()
-                    ? null
-                    : runResult.toolResults().get(runResult.toolResults().size() - 1);
+            ToolResult last = runResult.evidenceOrLast();
 
             if (last == null) {
                 return new AnalysisResult(answer, "-", 0, List.of());
@@ -148,25 +190,81 @@ public class SqlAnalysisService {
         });
     }
 
+    /**
+     * 与 analyze 相同的 Agent 流程，额外返回逐步轨迹、token 用量和耗时，供离线评测使用。
+     * 运行失败时不抛异常，而是把错误写入结果，便于评测脚本统计。
+     */
+    public TracedAnalysisResult analyzeWithTrace(
+            String rawQuery,
+            List<HistoryTurn> history,
+            ModelConnectionConfig modelConfig,
+            String requestedMode,
+            String username
+    ) {
+        RunTrace trace = new RunTrace();
+        RUN_TRACE.set(trace);
+        USER_CONTEXT.set(username);
+        long started = System.nanoTime();
+        try {
+            ExecutionContext context = resolveExecutionContext(null);
+            ModelConnectionConfig safeModelConfig = normalizeModelConfig(modelConfig);
+            return withExecutionAndModelContext(context, safeModelConfig, () -> {
+                String userQuery = normalizeQuery(rawQuery);
+                List<HistoryTurn> safeHistory = normalizeHistory(history);
+                String effectiveQuery = applyContextHints(userQuery, safeHistory);
+                AgentRunResult runResult = runConfiguredAgent(requestedMode, userQuery, effectiveQuery, safeHistory, safeModelConfig, null);
+                ToolResult last = runResult.evidenceOrLast();
+                return trace.toResult(runResult.answer(), last, elapsedMs(started), null);
+            });
+        } catch (RuntimeException ex) {
+            return trace.toResult("", null, elapsedMs(started), formatError(ex));
+        } finally {
+            RUN_TRACE.remove();
+            USER_CONTEXT.remove();
+        }
+    }
+
     public Flux<String> analyzeStream(String rawQuery, List<HistoryTurn> history) {
         return analyzeStream(rawQuery, history, null);
     }
 
     public Flux<String> analyzeStream(String rawQuery, List<HistoryTurn> history, DbConnectionConfig dbConfig) {
+        return analyzeStream(rawQuery, history, dbConfig, null);
+    }
+
+    public Flux<String> analyzeStream(
+            String rawQuery,
+            List<HistoryTurn> history,
+            DbConnectionConfig dbConfig,
+            ModelConnectionConfig modelConfig
+    ) {
+        return analyzeStream(rawQuery, history, dbConfig, modelConfig, null);
+    }
+
+    public Flux<String> analyzeStream(
+            String rawQuery,
+            List<HistoryTurn> history,
+            DbConnectionConfig dbConfig,
+            ModelConnectionConfig modelConfig,
+            String username
+    ) {
         return Flux.create(sink -> Schedulers.boundedElastic().schedule(() -> {
+            USER_CONTEXT.set(username);
             try {
                 ExecutionContext context = resolveExecutionContext(dbConfig);
-                withExecutionContext(context, () -> {
+                withExecutionAndModelContext(context, normalizeModelConfig(modelConfig), () -> {
                     String userQuery = normalizeQuery(rawQuery);
                     List<HistoryTurn> safeHistory = normalizeHistory(history);
                     String effectiveQuery = applyContextHints(userQuery, safeHistory);
 
                     sink.next(toStatusPayload("\u6B63\u5728\u7406\u89E3\u95EE\u9898..."));
 
-                    AgentRunResult runResult = runAgent(
+                    AgentRunResult runResult = runConfiguredAgent(
+                            null,
                             userQuery,
                             effectiveQuery,
                             safeHistory,
+                            normalizeModelConfig(modelConfig),
                             message -> sink.next(toStatusPayload(message))
                     );
 
@@ -181,15 +279,529 @@ public class SqlAnalysisService {
                 sink.next(toStreamPayload("text_generated", formatError(ex)));
                 sink.next(toStreamPayload("message_end", ""));
             } finally {
+                USER_CONTEXT.remove();
                 sink.complete();
             }
         }));
     }
 
+    private AgentRunResult runConfiguredAgent(
+            String requestedMode,
+            String userQuery,
+            String effectiveQuery,
+            List<HistoryTurn> history,
+            ModelConnectionConfig modelConfig,
+            StreamReporter reporter
+    ) {
+        String mode = requestedMode == null || requestedMode.isBlank() ? agentMode : requestedMode;
+        if ("tools".equalsIgnoreCase(mode.trim())) {
+            return runToolAgent(userQuery, history, reporter);
+        }
+        return runAgent(userQuery, effectiveQuery, history, modelConfig, reporter);
+    }
+
+    // ---------------------------------------------------------------------
+    // 原生 Function Calling 模式
+    // ---------------------------------------------------------------------
+
+    private static final String TOOL_AGENT_SYSTEM_PROMPT = """
+            你是仓储数据分析助手，连接的是 Microsoft SQL Server 数据库。通过工具查询数据后回答用户的问题。
+
+            工作方式：
+            1. 不确定有哪些表时调用 list_tables；写 SQL 前先用 describe_table 确认列名、字段口径和取值，不要猜。
+            2. 用 run_sql 执行只读查询（单条 SELECT 或 WITH 语句）。可以先做探索、核对类查询（is_final_result=false），
+               但给出结论前必须执行一条 is_final_result=true 的查询，它的结果要正好对应你的回答：
+               问"哪一个最多"就只返回那一行，问前 N 名就返回 N 行，问总数就返回一个数，问清单就返回清单。
+               用户会用这条 SQL 核对你的结论。
+            3. run_sql 返回 error 时，根据错误信息修正 SQL 后重试，不要编造数据。
+            4. 问题缺少关键条件、也无法合理推断时（例如没说是哪个商品、哪个客户），调用 ask_user 追问；
+               能用合理默认值查询的问题直接查询。
+            5. 问题涉及公司制度、标准或审批阈值（例如近效期怎么定义、安全库存是多少、什么情况需要复核）时，
+               先用 search_docs 在业务资料里查到规则，再用 run_sql 按规则查数据，回答中注明依据的资料名称。
+            6. 只能读取数据。用户要求修改、删除数据或查看系统表时，直接说明无法执行，不要调用 run_sql。
+            7. 用中文回答，先给结论和关键数字，再补充必要说明，简洁直接。
+
+            当前日期：%s（"今年"指 %s 年）。
+            可查询的表：
+            %s
+
+            SQL Server 写法：
+            - 取前几条用 TOP n，不支持 LIMIT。
+            - 文本类型的日期列，比较或按月、季度统计前先 CAST(列 AS DATE)。
+            - 中文字符串常量加 N 前缀，例如 N'销售出库'。
+            - 字段说明中列出了取值的枚举列（如单据类型），按取值精确匹配，不要用 LIKE 模糊匹配，
+              以免把含义不同的取值（例如销售出库和销售退货）混在一起。
+            """;
+
+    private AgentRunResult runToolAgent(String userQuery, List<HistoryTurn> history, StreamReporter reporter) {
+        ResolvedModel resolved = resolveModel();
+        if (resolved == null) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "AI 服务未配置 API Key，请检查模型配置后重试");
+        }
+        ChatModel chatModel = chatModelFactory.get(resolved.baseUrl(), resolved.apiKey(), resolved.model(), requestTimeoutSeconds);
+
+        List<ToolResult> toolResults = new ArrayList<>();
+        ToolResult[] evidence = {null};
+        int[] currentTurn = {0};
+        AnalysisAgentTools tools = new AnalysisAgentTools(new AnalysisAgentTools.Backend() {
+            @Override
+            public List<Map<String, Object>> listTables() {
+                recordStep(currentTurn[0], AnalysisAgentTools.LIST_TABLES, "", "", "", null, null, 0);
+                return listTablesForAgent();
+            }
+
+            @Override
+            public Map<String, Object> describeTable(String table) {
+                long started = System.nanoTime();
+                Map<String, Object> result = describeTableForAgent(table);
+                recordStep(currentTurn[0], AnalysisAgentTools.DESCRIBE_TABLE, "", safeText(table), "", null,
+                        (String) result.get("error"), elapsedMs(started));
+                return result;
+            }
+
+            @Override
+            public Map<String, Object> searchDocs(String query) {
+                long started = System.nanoTime();
+                Map<String, Object> result = searchDocsForAgent(query);
+                Object hits = result.get("results");
+                recordStep(currentTurn[0], AnalysisAgentTools.SEARCH_DOCS, "", safeText(query), "",
+                        hits instanceof List<?> list ? list.size() : null, (String) result.get("error"), elapsedMs(started));
+                return result;
+            }
+
+            @Override
+            public Map<String, Object> runSql(String sql, List<String> params, String reason, boolean finalResult) {
+                int before = toolResults.size();
+                Map<String, Object> result = runSqlForAgent(currentTurn[0], sql, params, reason, finalResult, toolResults, reporter);
+                if (finalResult && toolResults.size() > before) {
+                    evidence[0] = toolResults.get(toolResults.size() - 1);
+                }
+                return result;
+            }
+        }, objectMapper);
+
+        ToolCallback[] callbacks = ToolCallbacks.from(tools);
+        Map<String, ToolCallback> callbacksByName = new LinkedHashMap<>();
+        for (ToolCallback callback : callbacks) {
+            callbacksByName.put(callback.getToolDefinition().name(), callback);
+        }
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .model(resolved.model())
+                .temperature(0.1)
+                .toolCallbacks(callbacks)
+                .internalToolExecutionEnabled(false)
+                .parallelToolCalls(true)
+                .build();
+
+        List<Message> messages = new ArrayList<>();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        messages.add(new SystemMessage(TOOL_AGENT_SYSTEM_PROMPT.formatted(today, today.getYear(), formatTablesForPrompt())));
+        int historyStart = Math.max(0, history.size() - 8);
+        for (HistoryTurn turn : history.subList(historyStart, history.size())) {
+            String content = compressContextText(turn.content(), 1200, 800);
+            messages.add("assistant".equalsIgnoreCase(turn.role()) ? new AssistantMessage(content) : new UserMessage(content));
+        }
+        messages.add(new UserMessage(userQuery));
+
+        int maxTurns = Math.max(2, Math.min(maxToolTurns, 12));
+        for (int turn = 1; turn <= maxTurns; turn++) {
+            currentTurn[0] = turn;
+            if (reporter != null) {
+                reporter.emit("正在思考分析路径 (step " + turn + "/" + maxTurns + ")...\n\n");
+            }
+            AssistantMessage assistant = callAgentModel(chatModel, new Prompt(messages, options));
+            if (!assistant.hasToolCalls()) {
+                String answer = safeText(assistant.getText());
+                recordStep(turn, "final", "", "", answer, null, null, 0);
+                if (!answer.isBlank()) {
+                    return new AgentRunResult(answer, toolResults, evidence[0]);
+                }
+                break;
+            }
+
+            for (AssistantMessage.ToolCall call : assistant.getToolCalls()) {
+                if (AnalysisAgentTools.ASK_USER.equals(call.name())) {
+                    String question = readJsonField(call.arguments(), "question");
+                    recordStep(turn, "ask_user", "", "", question, null, null, 0);
+                    return new AgentRunResult(question.isBlank()
+                            ? "这个问题还缺少必要条件，你能补充一下吗？"
+                            : question, toolResults, evidence[0]);
+                }
+            }
+
+            messages.add(assistant);
+            List<ToolResponseMessage.ToolResponse> responses = new ArrayList<>();
+            for (AssistantMessage.ToolCall call : assistant.getToolCalls()) {
+                ToolCallback callback = callbacksByName.get(call.name());
+                String result;
+                if (callback == null) {
+                    result = toJsonQuietly(Map.of("error", "未知工具：" + call.name()));
+                } else {
+                    try {
+                        result = callback.call(call.arguments());
+                    } catch (RuntimeException ex) {
+                        // 参数解析失败等情况：把错误交还给模型，让它修正调用
+                        result = toJsonQuietly(Map.of("error", "工具调用失败：" + rootErrorMessage(ex)));
+                        recordStep(turn, call.name(), "", "", "", null, rootErrorMessage(ex), 0);
+                    }
+                }
+                responses.add(new ToolResponseMessage.ToolResponse(call.id(), call.name(), result));
+            }
+            messages.add(ToolResponseMessage.builder().responses(responses).build());
+        }
+
+        // 达到轮数上限仍未给出结论：禁止继续调用工具，要求模型基于已有结果作答
+        recordStep(maxTurns + 1, "synthesize", "", "", "", null, null, 0);
+        messages.add(new UserMessage("已达到工具调用次数上限。请基于以上查询结果直接给出结论，不要再调用工具。"));
+        OpenAiChatOptions finalOptions = OpenAiChatOptions.builder()
+                .model(resolved.model())
+                .temperature(0.1)
+                .toolCallbacks(callbacks)
+                .internalToolExecutionEnabled(false)
+                .toolChoice(OpenAiApi.ChatCompletionRequest.ToolChoiceBuilder.NONE)
+                .build();
+        String answer = safeText(callAgentModel(chatModel, new Prompt(messages, finalOptions)).getText());
+        if (answer.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "AI 服务未返回分析结论，请检查模型配置后重试");
+        }
+        return new AgentRunResult(answer, toolResults, evidence[0]);
+    }
+
+    private AssistantMessage callAgentModel(ChatModel chatModel, Prompt prompt) {
+        RunTrace trace = RUN_TRACE.get();
+        ChatResponse response;
+        try {
+            response = chatModel.call(prompt);
+        } catch (RuntimeException ex) {
+            if (trace != null) {
+                trace.llmErrors++;
+            }
+            log.warn("Tool-calling analysis agent request failed", ex);
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "AI 服务请求失败：" + rootErrorMessage(ex));
+        }
+        if (trace != null) {
+            trace.llmCalls++;
+            Usage usage = response.getMetadata() == null ? null : response.getMetadata().getUsage();
+            if (usage != null) {
+                trace.promptTokens += usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
+                trace.completionTokens += usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
+                if (usage.getNativeUsage() instanceof OpenAiApi.Usage nativeUsage
+                        && nativeUsage.promptTokensDetails() != null
+                        && nativeUsage.promptTokensDetails().cachedTokens() != null) {
+                    trace.cachedPromptTokens += nativeUsage.promptTokensDetails().cachedTokens();
+                }
+            }
+        }
+        if (response.getResult() == null || response.getResult().getOutput() == null) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "AI 服务未返回内容");
+        }
+        return response.getResult().getOutput();
+    }
+
+    private Map<String, Object> runSqlForAgent(
+            int turn,
+            String sql,
+            List<String> params,
+            String reason,
+            boolean finalResult,
+            List<ToolResult> toolResults,
+            StreamReporter reporter
+    ) {
+        String normalized = normalizeSql(sql);
+        List<Object> safeParams = new ArrayList<>(params == null ? List.of() : params);
+        long started = System.nanoTime();
+        try {
+            if (normalized.isBlank()) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "SQL is empty.");
+            }
+            if (reporter != null) {
+                reporter.emit("正在查询数据库...\n");
+            }
+            ToolResult result = executeToolQuery(normalized, safeParams, reason);
+            toolResults.add(result);
+            recordStep(turn, AnalysisAgentTools.RUN_SQL, result.sqlPreview(), reason, finalResult ? "final_result" : "",
+                    result.rowCount(), null, elapsedMs(started));
+            if (reporter != null) {
+                reporter.emit("查询完成，返回 " + result.rowCount() + " 行。\n\n");
+            }
+            List<Map<String, Object>> preview = previewRows(result.rows());
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("rowCount", result.rowCount());
+            body.put("rows", preview);
+            body.put("truncated", result.rowCount() > preview.size());
+            if (result.rowCount() >= Math.max(1, maxQueryRows)) {
+                body.put("note", "结果达到行数上限 " + maxQueryRows + "，可能不完整，请加筛选或聚合。");
+            }
+            return body;
+        } catch (RuntimeException ex) {
+            String error = rootErrorMessage(ex);
+            recordStep(turn, AnalysisAgentTools.RUN_SQL, toSqlPreview(normalized, safeParams), reason, "", null, error, elapsedMs(started));
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("error", error);
+            body.put("hint", "SQL 未执行成功。请根据错误信息修正后重新调用 run_sql；如果是列名或取值问题，先调用 describe_table 确认。");
+            return body;
+        }
+    }
+
+    private String formatTablesForPrompt() {
+        StringBuilder sb = new StringBuilder();
+        for (Map<String, Object> table : listTablesForAgent()) {
+            sb.append("- ").append(table.get("table"));
+            Object description = table.get("description");
+            if (description != null && !String.valueOf(description).isBlank()) {
+                sb.append("：").append(description);
+            }
+            Object rowCount = table.get("rowCount");
+            if (rowCount != null) {
+                sb.append("（").append(rowCount).append(" 行）");
+            }
+            sb.append("\n");
+        }
+        return sb.toString().trim();
+    }
+
+    private Map<String, Object> searchDocsForAgent(String query) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        String username = USER_CONTEXT.get();
+        if (knowledgeIndexService == null || !knowledgeIndexService.isReady()) {
+            body.put("error", "资料库当前不可用：" + (knowledgeIndexService == null ? "未启用" : knowledgeIndexService.status()));
+            return body;
+        }
+        if (username == null || username.isBlank()) {
+            body.put("error", "未识别当前用户，无法检索资料");
+            return body;
+        }
+        try {
+            List<Map<String, Object>> results = new ArrayList<>();
+            for (var chunk : knowledgeIndexService.search(username, safeText(query), knowledgeIndexService.defaultMode(), 4)) {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("source", chunk.fileName());
+                item.put("content", chunk.content());
+                results.add(item);
+            }
+            body.put("results", results);
+            if (results.isEmpty()) {
+                body.put("note", "没有找到相关资料，请换个说法或说明资料中没有相关规定。");
+            }
+        } catch (RuntimeException ex) {
+            body.put("error", "资料检索失败：" + rootErrorMessage(ex));
+        }
+        return body;
+    }
+
+    private List<Map<String, Object>> listTablesForAgent() {
+        List<Map<String, Object>> tables = new ArrayList<>();
+        Set<Object> seenObjects = new LinkedHashSet<>();
+        for (String table : tablesForSchemaHint(getAllowedTablesNormalized())) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("table", table);
+            try {
+                Integer objectId = activeJdbcTemplate().queryForObject("SELECT OBJECT_ID(?)", Integer.class, table);
+                if (objectId == null || !seenObjects.add(objectId)) {
+                    continue;
+                }
+                item.put("description", readTableDescription(table));
+                item.put("rowCount", activeJdbcTemplate().queryForObject("SELECT COUNT(*) FROM " + toSqlIdentifier(table), Long.class));
+            } catch (Exception ex) {
+                // 非 SQL Server（如 H2 测试库）没有 OBJECT_ID / 扩展属性，只返回表名
+                if (!seenObjects.add(table)) {
+                    continue;
+                }
+            }
+            tables.add(item);
+        }
+        return tables;
+    }
+
+    private Map<String, Object> describeTableForAgent(String rawTable) {
+        String normalized = normalizeTableRef(rawTable == null ? "" : rawTable);
+        Set<String> allowed = getAllowedTablesNormalized();
+        if (normalized.isBlank() || !allowed.contains(normalized)) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", "表不存在或不允许查询：" + rawTable);
+            error.put("allowedTables", tablesForSchemaHint(allowed));
+            return error;
+        }
+        String cacheKey = System.identityHashCode(activeJdbcTemplate()) + "|" + normalized;
+        CachedTableDescription cached = tableDescriptionCache.get(cacheKey);
+        if (cached != null && cached.expiresAt() > System.currentTimeMillis()) {
+            return cached.description();
+        }
+        Map<String, Object> description = buildTableDescription(normalized);
+        tableDescriptionCache.put(cacheKey, new CachedTableDescription(description, System.currentTimeMillis() + 10 * 60_000L));
+        return description;
+    }
+
+    private Map<String, Object> buildTableDescription(String table) {
+        JdbcTemplate jdbc = activeJdbcTemplate();
+        String tableSql = toSqlIdentifier(table);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("table", table);
+
+        List<Map<String, Object>> columns;
+        try {
+            columns = jdbc.queryForList("""
+                    SELECT c.name AS name, t.name AS type, CAST(ep.value AS NVARCHAR(1000)) AS description
+                    FROM sys.columns c
+                    JOIN sys.types t ON t.user_type_id = c.user_type_id
+                    LEFT JOIN sys.extended_properties ep
+                      ON ep.class = 1 AND ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = 'MS_Description'
+                    WHERE c.object_id = OBJECT_ID(?)
+                    ORDER BY c.column_id
+                    """, table);
+            result.put("description", readTableDescription(table));
+        } catch (Exception ex) {
+            columns = new ArrayList<>();
+        }
+        if (columns.isEmpty()) {
+            // 非 SQL Server（如 H2）没有 sys.columns / 扩展属性，退化为只取列名
+            for (String name : readColumnsForTable(table)) {
+                Map<String, Object> column = new LinkedHashMap<>();
+                column.put("name", name);
+                columns.add(column);
+            }
+        }
+        if (columns.isEmpty()) {
+            result.put("error", "读取表结构失败：" + table);
+            return result;
+        }
+
+        // 一次聚合拿到总行数、各列空值数和数值列范围
+        StringBuilder statsSql = new StringBuilder("SELECT COUNT(*) AS [__total]");
+        for (Map<String, Object> column : columns) {
+            String name = String.valueOf(column.get("name"));
+            String col = quoteIdentifier(name);
+            statsSql.append(", SUM(CASE WHEN ").append(col).append(" IS NULL THEN 1 ELSE 0 END) AS ").append(quoteIdentifier("null:" + name));
+            if (isNumericType(column.get("type"))) {
+                statsSql.append(", MIN(").append(col).append(") AS ").append(quoteIdentifier("min:" + name));
+                statsSql.append(", MAX(").append(col).append(") AS ").append(quoteIdentifier("max:" + name));
+            }
+        }
+        statsSql.append(" FROM ").append(tableSql);
+        Map<String, Object> stats = Map.of();
+        try {
+            stats = jdbc.queryForMap(statsSql.toString());
+            result.put("rowCount", stats.get("__total"));
+        } catch (Exception ex) {
+            log.debug("Column stats unavailable for {}", table, ex);
+        }
+
+        List<Map<String, Object>> described = new ArrayList<>();
+        for (Map<String, Object> column : columns) {
+            String name = String.valueOf(column.get("name"));
+            Map<String, Object> item = new LinkedHashMap<>(column);
+            item.values().removeIf(v -> v == null);
+            Object nulls = stats.get("null:" + name);
+            if (nulls != null) {
+                item.put("nullCount", nulls);
+            }
+            if (stats.containsKey("min:" + name)) {
+                item.put("min", stats.get("min:" + name));
+                item.put("max", stats.get("max:" + name));
+            }
+            if (isTextType(column.get("type")) && !"id".equalsIgnoreCase(name)) {
+                addValueProfile(jdbc, tableSql, name, item);
+            }
+            described.add(item);
+        }
+        result.put("columns", described);
+        return result;
+    }
+
+    private void addValueProfile(JdbcTemplate jdbc, String tableSql, String column, Map<String, Object> item) {
+        String col = quoteIdentifier(column);
+        try {
+            Long distinct = jdbc.queryForObject("SELECT COUNT(DISTINCT " + col + ") FROM " + tableSql, Long.class);
+            item.put("distinctCount", distinct);
+            int limit = distinct != null && distinct <= 30 ? 30 : 3;
+            List<Object> values = jdbc.queryForList("SELECT TOP " + limit + " " + col + " FROM " + tableSql
+                    + " WHERE " + col + " IS NOT NULL GROUP BY " + col + " ORDER BY COUNT(*) DESC", Object.class);
+            item.put(limit == 30 ? "values" : "examples", values);
+        } catch (Exception ex) {
+            log.debug("Value profile unavailable for {}.{}", tableSql, column, ex);
+        }
+    }
+
+    private String readTableDescription(String table) {
+        try {
+            return activeJdbcTemplate().queryForObject("""
+                    SELECT CAST(value AS NVARCHAR(1000)) FROM sys.extended_properties
+                    WHERE class = 1 AND major_id = OBJECT_ID(?) AND minor_id = 0 AND name = 'MS_Description'
+                    """, String.class, table);
+        } catch (Exception ex) {
+            return "";
+        }
+    }
+
+    private static boolean isNumericType(Object type) {
+        String t = String.valueOf(type).toLowerCase(Locale.ROOT);
+        return t.contains("int") || t.contains("decimal") || t.contains("numeric") || t.contains("float")
+                || t.contains("real") || t.contains("money");
+    }
+
+    private static boolean isTextType(Object type) {
+        String t = String.valueOf(type).toLowerCase(Locale.ROOT);
+        return type == null || t.contains("char") || t.contains("text");
+    }
+
+    private static String quoteIdentifier(String name) {
+        return "[" + name.replace("]", "]]") + "]";
+    }
+
+    private String readJsonField(String json, String field) {
+        try {
+            return safeText(objectMapper.readTree(json).path(field).asText(""));
+        } catch (Exception ex) {
+            return "";
+        }
+    }
+
+    private String toJsonQuietly(Object value) {
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (Exception ex) {
+            return "{}";
+        }
+    }
+
+    private ResolvedModel resolveModel() {
+        ModelConnectionConfig modelConfig = MODEL_CONTEXT.get();
+        String apiKey = firstNonBlank(
+                modelConfig == null ? null : modelConfig.apiKey(),
+                modelConfig == null ? null : modelConfig.deepseekApiKey(),
+                deepseekApiKey
+        );
+        if (apiKey == null || apiKey.isBlank()) {
+            return null;
+        }
+        String baseUrl = firstNonBlank(
+                modelConfig == null ? null : modelConfig.baseUrl(),
+                modelConfig == null ? null : modelConfig.deepseekBaseUrl(),
+                deepseekBaseUrl
+        );
+        String model = firstNonBlank(
+                modelConfig == null ? null : modelConfig.model(),
+                modelConfig == null ? null : modelConfig.deepseekModel(),
+                deepseekModel
+        );
+        return new ResolvedModel(baseUrl, apiKey, model);
+    }
+
+    private record ResolvedModel(String baseUrl, String apiKey, String model) {
+    }
+
+    private record CachedTableDescription(Map<String, Object> description, long expiresAt) {
+    }
+
+    // ---------------------------------------------------------------------
+    // JSON 文本动作模式（原实现）
+    // ---------------------------------------------------------------------
+
     private AgentRunResult runAgent(
             String userQuery,
             String effectiveQuery,
             List<HistoryTurn> history,
+            ModelConnectionConfig modelConfig,
             StreamReporter reporter
     ) {
         String schemaHint = buildSchemaHint();
@@ -212,6 +824,7 @@ public class SqlAnalysisService {
             );
 
             if (decision == null) {
+                recordStep(step, "no_decision", "", "", "", null, null, 0);
                 break;
             }
 
@@ -220,18 +833,30 @@ public class SqlAnalysisService {
                 if (message.isBlank()) {
                     message = "\u8FD9\u4E2A\u95EE\u9898\u8FD8\u7F3A\u5C11\u5FC5\u8981\u6761\u4EF6\uff0c\u4F60\u80FD\u8865\u5145\u4E00\u4E0B\u65F6\u95F4\u8303\u56F4\u6216\u6307\u6807\u53E3\u5F84\u5417\uff1F";
                 }
+                recordStep(step, "ask_user", "", decision.reason(), message, null, null, 0);
                 return new AgentRunResult(message, toolResults);
             }
 
             if ("run_sql".equals(decision.action())) {
                 String sql = normalizeSql(decision.sql());
                 if (sql.isBlank()) {
+                    recordStep(step, "run_sql", "", decision.reason(), "", null, "empty sql", 0);
                     continue;
                 }
                 if (reporter != null) {
                     reporter.emit("\u6B63\u5728\u67E5\u8BE2\u6570\u636E\u5E93...\n");
                 }
-                ToolResult toolResult = executeToolQuery(sql, decision.params(), decision.reason());
+                long queryStarted = System.nanoTime();
+                ToolResult toolResult;
+                try {
+                    toolResult = executeToolQuery(sql, decision.params(), decision.reason());
+                } catch (RuntimeException ex) {
+                    recordStep(step, "run_sql", toSqlPreview(sql, decision.params()), decision.reason(), "",
+                            null, rootErrorMessage(ex), elapsedMs(queryStarted));
+                    throw ex;
+                }
+                recordStep(step, "run_sql", toolResult.sqlPreview(), decision.reason(), "",
+                        toolResult.rowCount(), null, elapsedMs(queryStarted));
                 toolResults.add(toolResult);
                 if (reporter != null) {
                     reporter.emit("\u67E5\u8BE2\u5B8C\u6210\uff0C\u8FD4\u56DE " + toolResult.rowCount() + " \u884C\u3002\n\n");
@@ -241,14 +866,16 @@ public class SqlAnalysisService {
 
             if ("final".equals(decision.action())) {
                 String answer = safeText(decision.message());
+                recordStep(step, "final", "", decision.reason(), answer, null, null, 0);
                 if (!answer.isBlank()) {
                     return new AgentRunResult(answer, toolResults);
                 }
             }
         }
 
-        String fallbackAnswer = synthesizeFinalAnswer(userQuery, effectiveQuery, history, toolResults);
-        return new AgentRunResult(fallbackAnswer, toolResults);
+        recordStep(safeSteps + 1, "synthesize", "", "", "", null, null, 0);
+        String finalAnswer = synthesizeFinalAnswer(userQuery, effectiveQuery, history, toolResults);
+        return new AgentRunResult(finalAnswer, toolResults);
     }
 
     private AgentDecision requestAgentDecision(
@@ -370,6 +997,10 @@ public class SqlAnalysisService {
         if (!repairedUnionColumnCount.isBlank()) {
             return repairedUnionColumnCount;
         }
+        String repairedTextIntComparison = tryRepairSqlForTextIntComparison(sql, ex);
+        if (!repairedTextIntComparison.isBlank()) {
+            return repairedTextIntComparison;
+        }
         return tryRepairSqlForAggregateTypeError(sql, ex);
     }
 
@@ -410,6 +1041,22 @@ public class SqlAnalysisService {
             return "";
         }
         String rewritten = rewriteNumericAggregates(sql);
+        if (rewritten == null || rewritten.isBlank()) {
+            return "";
+        }
+        String normalizedOriginal = normalizeSql(sql).toLowerCase(Locale.ROOT);
+        String normalizedRewritten = normalizeSql(rewritten).toLowerCase(Locale.ROOT);
+        if (normalizedOriginal.equals(normalizedRewritten)) {
+            return "";
+        }
+        return normalizeSql(rewritten);
+    }
+
+    private String tryRepairSqlForTextIntComparison(String sql, RuntimeException ex) {
+        if (!isTextIntConversionError(ex)) {
+            return "";
+        }
+        String rewritten = rewriteTextIntComparisons(sql);
         if (rewritten == null || rewritten.isBlank()) {
             return "";
         }
@@ -480,6 +1127,18 @@ public class SqlAnalysisService {
                 || message.contains("converting data type")
                 || message.contains("invalid for sum")
                 || message.contains("invalid for avg");
+    }
+
+    private boolean isTextIntConversionError(Throwable ex) {
+        String message = rootErrorMessage(ex).toLowerCase(Locale.ROOT);
+        if (!(message.contains("nvarchar") || message.contains("varchar"))) {
+            return false;
+        }
+        return (message.contains("int") || message.contains("integer"))
+                && (message.contains("convert")
+                || message.contains("converting")
+                || message.contains("转换")
+                || message.contains("转换成数据类型"));
     }
 
     private boolean isUnionOrderBySyntaxError(String sql, Throwable ex) {
@@ -563,6 +1222,47 @@ public class SqlAnalysisService {
         if (sql == null || sql.isBlank()) return sql;
         String withSafeSum = rewriteAggregateFunction(sql, "sum");
         return rewriteAggregateFunction(withSafeSum, "avg");
+    }
+
+    private String rewriteTextIntComparisons(String sql) {
+        if (sql == null || sql.isBlank()) return sql;
+
+        String rewritten = rewriteCastIntComparisons(sql);
+        return rewriteKnownTextColumnNumericComparisons(rewritten);
+    }
+
+    private String rewriteCastIntComparisons(String sql) {
+        Matcher matcher = Pattern.compile(
+                "(?is)CAST\\s*\\(\\s*([^()]+?)\\s+AS\\s+(?:BIGINT|INT|SMALLINT|TINYINT)\\s*\\)\\s*(=|<>|!=)\\s*(-?\\d+)"
+        ).matcher(sql);
+        StringBuffer out = new StringBuffer();
+        while (matcher.find()) {
+            String expression = matcher.group(1).trim();
+            String operator = matcher.group(2).trim();
+            String value = matcher.group(3).trim();
+            matcher.appendReplacement(out, Matcher.quoteReplacement(buildTextNumericComparison(expression, operator, value)));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    private String rewriteKnownTextColumnNumericComparisons(String sql) {
+        Matcher matcher = Pattern.compile(
+                "(?i)(?<![A-Za-z0-9_\\]])(\\[?(?:商品编号|商品名称|商品规格|单据编号|单据类型|供应商名称|按日期|有效期至)\\]?)\\s*(=|<>|!=)\\s*(-?\\d+)(?![A-Za-z0-9_])"
+        ).matcher(sql);
+        StringBuffer out = new StringBuffer();
+        while (matcher.find()) {
+            String expression = matcher.group(1).trim();
+            String operator = matcher.group(2).trim();
+            String value = matcher.group(3).trim();
+            matcher.appendReplacement(out, Matcher.quoteReplacement(buildTextNumericComparison(expression, operator, value)));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    private String buildTextNumericComparison(String expression, String operator, String value) {
+        return "CONVERT(NVARCHAR(4000), " + expression + ") " + operator + " N'" + value + "'";
     }
 
     private String rewriteTryConvertCalls(String sql) {
@@ -1350,7 +2050,7 @@ public class SqlAnalysisService {
         String userPrompt = buildFinalPrompt(userQuery, effectiveQuery, history, toolResults);
         String rawOutput = requestModelBlocking(systemPrompt, userPrompt);
         if (rawOutput == null || rawOutput.isBlank()) {
-            return buildFallbackText(userQuery, toolResults);
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "AI 服务未返回分析结论，请检查模型配置后重试");
         }
 
         AgentDecision maybeDecision = parseAgentDecision(rawOutput);
@@ -1391,10 +2091,11 @@ public class SqlAnalysisService {
                 - Respond in the same language as the user's question. If the user writes in Chinese, all ask_user and final messages must be in Chinese.
 
                 Domain hints for this dataset:
-                - Date column is usually 鎸夋棩鏈?
-                - Document type column is usually 鍗曟嵁绫诲瀷.
-                - For broad sales intent, prefer 鍗曟嵁绫诲瀷 LIKE '%閿€鍞?' unless user asks exact type.
-                - Typical KPI SQL fields: SUM(鍑哄簱鏁伴噺), SUM(寮€鍗曢噾棰?, COUNT(DISTINCT 鍗曟嵁缂栧彿).
+                - Date column is usually 按日期.
+                - Document type column is usually 单据类型.
+                - For broad sales intent, prefer 单据类型 LIKE '%销售%' unless user asks exact type.
+                - Typical KPI SQL fields: SUM(出库数量), SUM(开单金额), COUNT(DISTINCT 单据编号).
+                - Business codes and names such as 商品编号, 商品名称, 商品规格, 单据编号, 单据类型, 供应商名称, 按日期, 有效期至 are text fields; do not cast business codes to numbers; compare them as quoted strings.
 
                 - For SQL Server 2008 compatibility, avoid TRY_CONVERT and TRY_CAST.
                 - Avoid OFFSET / FETCH. Prefer TOP for first-page ranking queries.
@@ -1500,7 +2201,7 @@ public class SqlAnalysisService {
 
     private List<String> readColumnsForTable(String normalizedTable) {
         String sqlExpr = toSqlIdentifier(normalizedTable);
-        String sql = "SELECT TOP 0 * FROM " + sqlExpr;
+        String sql = "SELECT * FROM " + sqlExpr + " WHERE 1 = 0";
         try {
             return activeJdbcTemplate().query(sql, rs -> {
                 ResultSetMetaData meta = rs.getMetaData();
@@ -1571,20 +2272,37 @@ public class SqlAnalysisService {
     }
 
     private String requestModelBlocking(String systemPrompt, String userPrompt) {
-        String normalizedProvider = normalizeProvider(provider);
-        if ("dify".equals(normalizedProvider)) {
-            return requestByDify(systemPrompt, userPrompt);
-        }
+        ModelConnectionConfig modelConfig = MODEL_CONTEXT.get();
+        String normalizedProvider = normalizeProvider(firstNonBlank(
+                modelConfig == null ? null : modelConfig.provider(),
+                provider
+        ));
         return requestByDeepSeek(systemPrompt, userPrompt);
     }
 
     private String requestByDeepSeek(String systemPrompt, String userPrompt) {
-        if (deepseekApiKey == null || deepseekApiKey.isBlank()) {
+        ModelConnectionConfig modelConfig = MODEL_CONTEXT.get();
+        String apiKey = firstNonBlank(
+                modelConfig == null ? null : modelConfig.apiKey(),
+                modelConfig == null ? null : modelConfig.deepseekApiKey(),
+                deepseekApiKey
+        );
+        String baseUrl = firstNonBlank(
+                modelConfig == null ? null : modelConfig.baseUrl(),
+                modelConfig == null ? null : modelConfig.deepseekBaseUrl(),
+                deepseekBaseUrl
+        );
+        String model = firstNonBlank(
+                modelConfig == null ? null : modelConfig.model(),
+                modelConfig == null ? null : modelConfig.deepseekModel(),
+                deepseekModel
+        );
+        if (apiKey == null || apiKey.isBlank()) {
             return "";
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", deepseekModel);
+        body.put("model", model);
         body.put("temperature", 0.1);
         body.put("stream", false);
         body.put("messages", List.of(
@@ -1594,54 +2312,59 @@ public class SqlAnalysisService {
 
         try {
             String responseBody = webClient.post()
-                    .uri(deepseekBaseUrl + "/chat/completions")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + deepseekApiKey)
+                    .uri(trimTrailingSlash(baseUrl) + "/chat/completions")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(body)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, response ->
-                            Mono.error(new RuntimeException("DeepSeek request failed: " + response.statusCode()))
+                            Mono.error(new RuntimeException("OpenAI-compatible request failed: " + response.statusCode()))
                     )
                     .bodyToMono(String.class)
                     .timeout(Duration.ofSeconds(requestTimeoutSeconds))
                     .block();
+            recordUsage(responseBody);
             return extractDeepSeekContent(responseBody);
         } catch (Exception ex) {
-            log.warn("DeepSeek analysis agent request failed", ex);
+            log.warn("OpenAI-compatible analysis agent request failed", ex);
+            RunTrace trace = RUN_TRACE.get();
+            if (trace != null) {
+                trace.llmErrors++;
+            }
             return "";
         }
     }
 
-    private String requestByDify(String systemPrompt, String userPrompt) {
-        if (difyApiKey == null || difyApiKey.isBlank()) {
-            return "";
+    private void recordUsage(String responseBody) {
+        RunTrace trace = RUN_TRACE.get();
+        if (trace == null || responseBody == null || responseBody.isBlank()) {
+            return;
         }
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("inputs", Map.of());
-        body.put("query", systemPrompt + "\n\n" + userPrompt);
-        body.put("response_mode", "blocking");
-        body.put("user", "analysis_agent");
-        body.put("conversation_id", "");
-
+        trace.llmCalls++;
         try {
-            String responseBody = webClient.post()
-                    .uri(difyBaseUrl + "/chat-messages")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + difyApiKey)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(body)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, response ->
-                            Mono.error(new RuntimeException("Dify request failed: " + response.statusCode()))
-                    )
-                    .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(requestTimeoutSeconds))
-                    .block();
-            return extractDifyContent(responseBody);
-        } catch (Exception ex) {
-            log.warn("Dify analysis agent request failed", ex);
-            return "";
+            JsonNode usage = objectMapper.readTree(responseBody).path("usage");
+            trace.promptTokens += usage.path("prompt_tokens").asLong(0);
+            trace.completionTokens += usage.path("completion_tokens").asLong(0);
+            long cached = usage.path("prompt_cache_hit_tokens").asLong(
+                    usage.path("prompt_tokens_details").path("cached_tokens").asLong(0));
+            trace.cachedPromptTokens += cached;
+        } catch (Exception ignored) {
+            // 用量缺失不影响主流程
         }
+    }
+
+    private void recordStep(int step, String action, String sql, String reason, String message,
+                            Integer rowCount, String error, long durationMs) {
+        RunTrace trace = RUN_TRACE.get();
+        if (trace == null) {
+            return;
+        }
+        trace.steps.add(new StepTrace(step, action, safeText(sql), safeText(reason),
+                compressContextText(safeText(message), 800, 600), rowCount, error, durationMs));
+    }
+
+    private static long elapsedMs(long startedNanos) {
+        return (System.nanoTime() - startedNanos) / 1_000_000;
     }
 
     private String extractDeepSeekContent(String responseBody) {
@@ -1651,25 +2374,6 @@ public class SqlAnalysisService {
             JsonNode choices = root.path("choices");
             if (choices.isArray() && !choices.isEmpty()) {
                 return choices.get(0).path("message").path("content").asText("").trim();
-            }
-            return "";
-        } catch (Exception ex) {
-            return "";
-        }
-    }
-
-    private String extractDifyContent(String responseBody) {
-        if (responseBody == null || responseBody.isBlank()) return "";
-        try {
-            JsonNode root = objectMapper.readTree(responseBody);
-            String answer = root.path("answer").asText("");
-            if (!answer.isBlank()) return answer.trim();
-            String content = root.path("content").asText("");
-            if (!content.isBlank()) return content.trim();
-            JsonNode message = root.path("message");
-            if (!message.isMissingNode()) {
-                content = message.path("content").asText("");
-                if (!content.isBlank()) return content.trim();
             }
             return "";
         } catch (Exception ex) {
@@ -1713,157 +2417,6 @@ public class SqlAnalysisService {
             sb.append("Rows: ").append(result.rowCount()).append("\n");
         }
         return sb.toString().trim();
-    }
-
-    private String buildFallbackText(String userQuery, List<ToolResult> toolResults) {
-        if (toolResults == null || toolResults.isEmpty()) {
-            return "\u6211\u8FD8\u6CA1\u62FF\u5230\u8DB3\u591F\u6570\u636E\u6765\u56DE\u7B54\u8FD9\u4E2A\u95EE\u9898\uff0C\u4F60\u53EF\u4EE5\u518D\u7ED9\u6211\u4E00\u4E2A\u5177\u4F53\u6307\u6807\u6216\u65F6\u95F4\u8303\u56F4\u3002";
-        }
-        ToolResult last = toolResults.get(toolResults.size() - 1);
-        List<Map<String, Object>> rows = last.rows() == null ? List.of() : last.rows();
-
-        if (looksLikeProductRecommendationQuery(userQuery)) {
-            String recommendation = buildRecommendationSummary(rows);
-            if (!recommendation.isBlank()) {
-                return recommendation;
-            }
-        }
-
-        String metricSummary = buildMetricSummary(rows);
-        if (!metricSummary.isBlank()) {
-            return metricSummary;
-        }
-
-        return "\u5DF2\u5B8C\u6210\u67E5\u8BE2\uff0C\u8FD4\u56DE " + last.rowCount()
-                + " \u884C\u3002\u8BF7\u518D\u6307\u5B9A\u4E00\u4E2A\u5206\u6790\u7EF4\u5EA6\uff08\u4F8B\u5982\uFF1A\u6309\u5546\u54C1/\u5BA2\u6237/\u5468\u6B21\u5BF9\u6BD4\uFF09\uFF0C\u6211\u7EE7\u7EED\u7ED9\u4F60\u51C6\u786E\u7ED3\u8BBA\u3002";
-    }
-
-    private boolean looksLikeProductRecommendationQuery(String query) {
-        if (query == null || query.isBlank()) return false;
-        return query.contains("\u5356\u5F97\u6BD4\u8F83\u597D")
-                || query.contains("\u5356\u7684\u597D")
-                || query.contains("\u70ED\u9500")
-                || query.contains("\u8865\u8D27")
-                || query.contains("\u63A8\u8350")
-                || query.toLowerCase(Locale.ROOT).contains("top")
-                || query.toLowerCase(Locale.ROOT).contains("best seller");
-    }
-
-    private String buildRecommendationSummary(List<Map<String, Object>> rows) {
-        if (rows == null || rows.isEmpty()) {
-            return "\u5F53\u524D\u67E5\u8BE2\u6CA1\u6709\u8FD4\u56DE\u53EF\u7528\u9500\u552E\u660E\u7EC6\uff0C\u6682\u65F6\u65E0\u6CD5\u7ED9\u51FA\u8865\u8D27\u63A8\u8350\u3002";
-        }
-
-        String nameCol = detectColumn(rows.get(0),
-                "\u5546\u54C1\u540D\u79F0", "\u5546\u54C1\u540D", "\u54C1\u540D", "product_name", "productname");
-        String salesCol = detectColumn(rows.get(0),
-                "\u9500\u552E\u6570\u91CF", "\u603B\u51FA\u5E93\u6570\u91CF", "\u51FA\u5E93\u6570\u91CF", "\u9500\u91CF",
-                "total_sales_quantity", "total_sales", "qty", "quantity");
-        String stockCol = detectColumn(rows.get(0),
-                "\u73B0\u6709\u5E93\u5B58", "\u5F53\u524D\u5E93\u5B58", "\u5E93\u5B58\u6570\u91CF",
-                "current_stock", "currentstock", "stock_qty", "stockqty");
-
-        if (nameCol == null || salesCol == null) {
-            return "";
-        }
-
-        List<ProductScore> items = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            String name = normalizeText(row.get(nameCol));
-            double sales = toDouble(row.get(salesCol));
-            if (name.isBlank() || sales <= 0) continue;
-            double stock = stockCol == null ? -1 : toDouble(row.get(stockCol));
-            items.add(new ProductScore(name, sales, stock));
-        }
-        if (items.isEmpty()) {
-            return "";
-        }
-
-        items.sort((a, b) -> Double.compare(b.sales, a.sales));
-        int topN = Math.min(3, items.size());
-        StringBuilder sb = new StringBuilder();
-        sb.append("\u6839\u636E\u5F53\u524D\u6570\u636E\uFF0C\u5356\u5F97\u8F83\u597D\u7684\u5546\u54C1\u662F\uFF1A\n");
-        for (int i = 0; i < topN; i++) {
-            ProductScore item = items.get(i);
-            sb.append(i + 1).append(". ").append(item.name)
-                    .append("\uFF08\u9500\u91CF ").append(formatNumber(item.sales)).append("\uFF09\n");
-        }
-
-        sb.append("\n\u8865\u8D27\u5EFA\u8BAE\uFF1A\n");
-        for (int i = 0; i < topN; i++) {
-            ProductScore item = items.get(i);
-            if (item.stock >= 0) {
-                if (item.stock < item.sales * 0.2) {
-                    sb.append("- \u4F18\u5148\u8865\u8D27 ").append(item.name)
-                            .append("\uFF08\u5E93\u5B58 ").append(formatNumber(item.stock))
-                            .append("\uFF0C\u4F4E\u4E8E\u9500\u91CF\u7684 20%\uFF09\n");
-                } else {
-                    sb.append("- \u53EF\u6301\u7EED\u8DDF\u8E2A ").append(item.name)
-                            .append("\uFF08\u5E93\u5B58 ").append(formatNumber(item.stock))
-                            .append("\uFF0C\u6DA8\u52BF\u826F\u597D\uFF09\n");
-                }
-            } else {
-                sb.append("- \u5EFA\u8BAE\u4F18\u5148\u8865\u8D27 ").append(item.name)
-                        .append("\uFF08\u9AD8\u9500\u91CF\u54C1\u79CD\uFF09\n");
-            }
-        }
-        sb.append("\n\u5982\u9700\u8981\uFF0C\u6211\u53EF\u4EE5\u7EE7\u7EED\u7ED9\u4F60\u7B97\u201C\u5EFA\u8BAE\u8865\u8D27\u91CF\u201D\uFF08\u6309\u5B89\u5168\u5E93\u5B58+\u5468\u8F6C\u5929\u6570\uFF09\u3002");
-        return sb.toString().trim();
-    }
-
-    private String buildMetricSummary(List<Map<String, Object>> rows) {
-        if (rows == null || rows.isEmpty()) return "";
-        if (rows.size() == 1) {
-            Map<String, Object> row = rows.get(0);
-            List<String> metrics = new ArrayList<>();
-            for (Map.Entry<String, Object> entry : row.entrySet()) {
-                if (entry.getValue() instanceof Number number) {
-                    metrics.add(entry.getKey() + " = " + formatNumber(number.doubleValue()));
-                }
-            }
-            if (!metrics.isEmpty()) {
-                return "\u57FA\u4E8E\u67E5\u8BE2\u7ED3\u679C\uFF0C\u5173\u952E\u6307\u6807\u5982\u4E0B\uFF1A\n- "
-                        + String.join("\n- ", metrics);
-            }
-        }
-        return "";
-    }
-
-    private String detectColumn(Map<String, Object> row, String... candidates) {
-        if (row == null || row.isEmpty() || candidates == null) return null;
-        for (String candidate : candidates) {
-            for (String key : row.keySet()) {
-                if (key.equalsIgnoreCase(candidate)) return key;
-            }
-        }
-        for (String candidate : candidates) {
-            String c = candidate.toLowerCase(Locale.ROOT);
-            for (String key : row.keySet()) {
-                if (key.toLowerCase(Locale.ROOT).contains(c)) return key;
-            }
-        }
-        return null;
-    }
-
-    private String normalizeText(Object value) {
-        return value == null ? "" : String.valueOf(value).trim();
-    }
-
-    private double toDouble(Object value) {
-        if (value == null) return 0;
-        if (value instanceof Number n) return n.doubleValue();
-        try {
-            return Double.parseDouble(String.valueOf(value).trim());
-        } catch (Exception ex) {
-            return 0;
-        }
-    }
-
-    private String formatNumber(double value) {
-        if (Math.abs(value - Math.rint(value)) < 0.000001) {
-            return String.valueOf((long) Math.rint(value));
-        }
-        return String.format(Locale.ROOT, "%.2f", value);
     }
 
     private String formatError(Throwable ex) {
@@ -1974,6 +2527,40 @@ public class SqlAnalysisService {
         }
     }
 
+    private <T> T withExecutionAndModelContext(
+            ExecutionContext context,
+            ModelConnectionConfig modelConfig,
+            Supplier<T> action
+    ) {
+        EXECUTION_CONTEXT.set(context);
+        if (modelConfig != null) {
+            MODEL_CONTEXT.set(modelConfig);
+        }
+        try {
+            return action.get();
+        } finally {
+            EXECUTION_CONTEXT.remove();
+            MODEL_CONTEXT.remove();
+        }
+    }
+
+    private ModelConnectionConfig normalizeModelConfig(ModelConnectionConfig config) {
+        if (config == null || !Boolean.TRUE.equals(config.enabled())) {
+            return null;
+        }
+        return new ModelConnectionConfig(
+                true,
+                safeText(config.provider()),
+                safeText(config.nl2sqlProvider()),
+                safeText(config.baseUrl()),
+                config.apiKey(),
+                safeText(config.model()),
+                safeText(config.deepseekBaseUrl()),
+                config.deepseekApiKey(),
+                safeText(config.deepseekModel())
+        );
+    }
+
     private JdbcTemplate activeJdbcTemplate() {
         ExecutionContext context = EXECUTION_CONTEXT.get();
         if (context != null && context.jdbcTemplate() != null) {
@@ -1983,6 +2570,10 @@ public class SqlAnalysisService {
     }
 
     private ExecutionContext resolveExecutionContext(DbConnectionConfig dbConfig) {
+        if (dbConfig != null && !customDbEnabled) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "Custom database connections are disabled.");
+        }
+
         if (!hasCustomDbConfig(dbConfig)) {
             return new ExecutionContext(jdbcTemplate, getAllowedTablesNormalized());
         }
@@ -2151,13 +2742,20 @@ public class SqlAnalysisService {
 
     private String normalizeProvider(String rawProvider) {
         if (rawProvider == null || rawProvider.isBlank()) {
-            return "deepseek";
+            return "openai-compatible";
         }
         String value = rawProvider.trim().toLowerCase(Locale.ROOT);
-        if ("deepseek".equals(value) || "dify".equals(value)) {
+        if ("openai-compatible".equals(value) || "openai".equals(value) || "deepseek".equals(value)) {
             return value;
         }
-        return "deepseek";
+        return "openai-compatible";
+    }
+
+    private String trimTrailingSlash(String value) {
+        if (value == null || value.isBlank()) {
+            return "https://api.deepseek.com";
+        }
+        return value.trim().replaceAll("/+$", "");
     }
 
     private String normalizeQuery(String rawQuery) {
@@ -2418,6 +3016,19 @@ public class SqlAnalysisService {
     ) {
     }
 
+    public record ModelConnectionConfig(
+            Boolean enabled,
+            String provider,
+            String nl2sqlProvider,
+            String baseUrl,
+            String apiKey,
+            String model,
+            String deepseekBaseUrl,
+            String deepseekApiKey,
+            String deepseekModel
+    ) {
+    }
+
     public record AnalysisResult(
             String answer,
             String sqlTemplate,
@@ -2429,7 +3040,74 @@ public class SqlAnalysisService {
     public record HistoryTurn(String role, String content) {
     }
 
-    private record AgentRunResult(String answer, List<ToolResult> toolResults) {
+    public record StepTrace(
+            int step,
+            String action,
+            String sql,
+            String reason,
+            String message,
+            Integer rowCount,
+            String error,
+            long durationMs
+    ) {
+    }
+
+    public record UsageTrace(
+            int llmCalls,
+            int llmErrors,
+            long promptTokens,
+            long completionTokens,
+            long cachedPromptTokens
+    ) {
+    }
+
+    public record TracedAnalysisResult(
+            String answer,
+            String finalSql,
+            int rowCount,
+            List<Map<String, Object>> rows,
+            List<StepTrace> steps,
+            UsageTrace usage,
+            long latencyMs,
+            String error
+    ) {
+    }
+
+    private static final class RunTrace {
+        private final List<StepTrace> steps = new ArrayList<>();
+        private int llmCalls;
+        private int llmErrors;
+        private long promptTokens;
+        private long completionTokens;
+        private long cachedPromptTokens;
+
+        private TracedAnalysisResult toResult(String answer, ToolResult last, long latencyMs, String error) {
+            UsageTrace usage = new UsageTrace(llmCalls, llmErrors, promptTokens, completionTokens, cachedPromptTokens);
+            return new TracedAnalysisResult(
+                    answer == null ? "" : answer,
+                    last == null ? "" : last.sqlPreview(),
+                    last == null ? 0 : last.rowCount(),
+                    last == null ? List.of() : last.rows(),
+                    List.copyOf(steps),
+                    usage,
+                    latencyMs,
+                    error
+            );
+        }
+    }
+
+    /** evidence：模型标记为"回答依据"的查询；未标记时取最后一条成功的查询。 */
+    private record AgentRunResult(String answer, List<ToolResult> toolResults, ToolResult evidence) {
+        private AgentRunResult(String answer, List<ToolResult> toolResults) {
+            this(answer, toolResults, null);
+        }
+
+        private ToolResult evidenceOrLast() {
+            if (evidence != null) {
+                return evidence;
+            }
+            return toolResults.isEmpty() ? null : toolResults.get(toolResults.size() - 1);
+        }
     }
 
     private record AgentDecision(
@@ -2454,9 +3132,6 @@ public class SqlAnalysisService {
             List<Map<String, Object>> rows,
             String reason
     ) {
-    }
-
-    private record ProductScore(String name, double sales, double stock) {
     }
 
     private record ExecutionContext(JdbcTemplate jdbcTemplate, Set<String> allowedTables) {
