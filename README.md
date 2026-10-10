@@ -9,23 +9,23 @@
 ## 架构
 
 ```mermaid
-flowchart LR
+flowchart TB
     FE["Vue 3 前端<br/>浏览器 / Electron"] -- "REST · SSE · JWT" --> API
     EV["eval/ Python 评测"] -- "/api/ai/chat/analyze/trace" --> API
-    subgraph BE["my-ai · Spring Boot 3.5 + Spring AI 1.1"]
-        API["Controller<br/>AuthInterceptor 鉴权"] --> AG["分析 Agent<br/>SqlAnalysisService"]
+    subgraph BE["my-ai · Spring Boot 3.5"]
+        API["Controller<br/>AuthInterceptor 鉴权"] --> AG["分析 Agent · Spring AI<br/>SqlAnalysisService"]
         API --> QA["资料问答<br/>ChatService"]
         AG --> TL["工具<br/>list_tables · describe_table<br/>run_sql · search_docs · ask_user"]
         TL --> GD["SQL 安全校验<br/>只读 · 危险关键字 · 表白名单 · 行数上限"]
         TL --> RS["检索服务<br/>KnowledgeIndexService"]
         QA --> RS
     end
-    GD --> MS[("SQL Server<br/>业务库")]
-    EV -- "执行标准 SQL 比对结果集" --> MS
-    RS --> PG[("PostgreSQL + pgvector<br/>资料分块")]
-    AG -. "Function Calling" .-> LLM["OpenAI 兼容模型<br/>DeepSeek 等"]
+    AG -.-> LLM["OpenAI 兼容模型<br/>DeepSeek 等 · Function Calling"]
     QA -.-> LLM
-    RS -. "embedding · rerank" .-> EMB["bge-m3 · bge-reranker-v2-m3<br/>硅基流动"]
+    GD --> MS[("SQL Server<br/>业务库")]
+    EV -. "执行标准 SQL 比对结果集" .-> MS
+    RS --> PG[("PostgreSQL + pgvector<br/>资料分块")]
+    RS -.-> EMB["embedding · rerank<br/>bge-m3 · bge-reranker-v2-m3"]
 ```
 
 ### 分析 Agent：工具调用循环
@@ -45,7 +45,7 @@ sequenceDiagram
     loop 最多 8 轮（ANALYSIS_AGENT_MAX_TOOL_TURNS）
         M-->>S: tool_calls（可并行）
         alt ask_user
-            S-->>U: 反问缺失的条件，结束本轮
+            S-->>U: 反问缺失的条件，结束本次分析
         else describe_table / run_sql / search_docs
             S-->>U: SSE 推送当前步骤
             S->>T: 执行工具
@@ -65,20 +65,22 @@ sequenceDiagram
 
 ### 资料问答：RAG 检索链路
 
+入库（上传后异步执行）：
+
 ```mermaid
 flowchart LR
-    subgraph IDX["入库（上传后异步）"]
-        UP["Word / PDF / 文本"] --> EX["提取文本<br/>POI · PDFBox"] --> CH["按标题分块<br/>句子级重叠"] --> EM["bge-m3 向量化"] --> VS[("pgvector<br/>HNSW · 余弦<br/>元数据：用户名、文档、章节")]
-    end
-    subgraph QRY["检索"]
-        Q["问题"] --> VR["向量召回 top 20<br/>按用户名过滤"]
-        Q --> KR["BM25 关键词召回 top 20<br/>中文二元切分"]
-        VR --> RRF["RRF 融合<br/>Σ 1/(60+rank)"]
-        KR --> RRF
-        RRF --> RK["bge-reranker 重排"] --> TOP["前 5 块 → 提示词<br/>标注【来源 n】"]
-    end
-    VS --> VR
-    VS --> KR
+    UP["Word / PDF / 文本"] --> EX["提取文本<br/>POI · PDFBox"] --> CH["按标题分块<br/>句子级重叠"] --> EM["bge-m3 向量化"] --> VS[("pgvector<br/>HNSW · 余弦<br/>元数据：用户名、文档、章节")]
+```
+
+检索：
+
+```mermaid
+flowchart LR
+    Q["问题"] --> VR["向量召回 top 20<br/>按用户名过滤"]
+    Q --> KR["BM25 关键词召回 top 20<br/>中文二元切分"]
+    VR --> RRF["RRF 融合<br/>Σ 1/(60+rank)"]
+    KR --> RRF
+    RRF --> RK["bge-reranker 重排"] --> TOP["前 5 块注入提示词<br/>标注【来源 n】"]
 ```
 
 - **账号隔离**：向量召回和关键词召回都按当前用户名过滤，删除资料时同步删除分块；启动时对账，内容变化的文档自动重建索引。
