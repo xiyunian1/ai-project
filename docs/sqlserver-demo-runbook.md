@@ -16,7 +16,7 @@
 在 `ai-project/my-ai` 目录执行：
 
 ```powershell
-sqlcmd -S localhost -E -i .\init-myai.sql
+sqlcmd -S localhost -E -v MYAI_DB_PASSWORD="<自定义密码>" -i .\init-myai.sql
 sqlcmd -S localhost -E -i .\grant-myai.sql
 ```
 
@@ -24,7 +24,7 @@ sqlcmd -S localhost -E -i .\grant-myai.sql
 
 - 数据库：`myai`
 - 登录名：`myai_user`
-- 默认密码：`change-me`
+- 密码：执行时通过 `-v MYAI_DB_PASSWORD=...` 指定
 - 数据库用户：`myai_user`
 - 数据库角色：`db_owner`
 
@@ -56,7 +56,7 @@ sqlcmd -S localhost -d myai -E -Q "SELECT TOP 10 [商品编号], [商品名称],
 本项目提供了可选演示数据脚本，只插入/更新 `WMS-DEMO-*` 商品，不删除已有数据：
 
 ```powershell
-sqlcmd -S localhost -U myai_user -P "change-me" -d myai -f 65001 -i .\demo-inout-data.sql
+sqlcmd -S localhost -U myai_user -P "<自定义密码>" -d myai -f 65001 -i .\demo-inout-data.sql
 ```
 
 必须保留 `-f 65001`，避免旧版 SQL Server / `sqlcmd` 环境下脚本编码导致中文列名解析异常。脚本中的演示商品名称使用 ASCII 文本，避免旧实例和驱动组合在前端显示乱码。
@@ -70,7 +70,7 @@ $env:JWT_SECRET='demo-jwt-secret-should-be-at-least-32-bytes'
 $env:DB_URL='jdbc:jtds:sqlserver://localhost:1433/myai'
 $env:DB_DRIVER='net.sourceforge.jtds.jdbc.Driver'
 $env:DB_USERNAME='myai_user'
-$env:DB_PASSWORD='change-me'
+$env:DB_PASSWORD='<自定义密码>'
 $env:DB_DIALECT='org.hibernate.community.dialect.SQLServerLegacyDialect'
 $env:BOOTSTRAP_ADMIN_ENABLED='true'
 $env:BOOTSTRAP_ADMIN_USERNAME='admin'
